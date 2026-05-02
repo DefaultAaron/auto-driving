@@ -3,7 +3,7 @@ chapter: 5
 section: 1
 title: Point-cloud preprocessing
 language: EN
-workflow_status: draft
+workflow_status: reviewing
 tags:
   - book/section
   - book/chapter-5
@@ -14,19 +14,19 @@ tags:
 
 The Ch 5 classical pipeline is `preprocess → ground → cluster → fit → track`. Point-cloud preprocessing is the part that makes the rest of that pipeline physically meaningful: it puts points into a consistent frame, removes obvious non-object returns, controls point count, and chooses the representation that later algorithms consume. A ground segmenter, clusterer, or shape fitter can only be as trustworthy as the geometry it receives; a doubled car from bad deskew or a spray plume promoted into a cluster is already a detection failure before any RANSAC, Patchwork, Euclidean clustering, or Kalman filter appears.
 
-The prerequisites are small but non-negotiable. TF2 supplies the transform chain from `lidar` through `base_link` into `odom`, `map`, or `world`, as introduced in [[1_1_coordinate_frames_EN|Ch 1 §1.1]]. A ROS2 `PointCloud2` carries `header.stamp`, `frame_id`, and fields such as `x, y, z, intensity, ring, time`; the per-point `time` field is what makes sweep-level deskew possible, while Ch 2's ego-state estimator provides the IMU, wheel, and odometry source for interpolated ego-pose in [[2_1_ego_state_estimation_EN|Ch 2 §2.1]].
+The prerequisites are small but non-negotiable. TF2 supplies the transform chain from `lidar` through `base_link` into `odom`, `map`, or `world`, as introduced in [[1_1_coordinate_frames_EN|Ch 1 §1.1]]. LiDAR sensor basics — beam pattern, returns, and intensity caveats — come from [[1_3_lidar_calibration_EN|Ch 1 §1.3]]; sensor time-sync hygiene and rosbag clock semantics come from [[1_4_sensor_time_sync_EN|Ch 1 §1.4]]. A ROS2 `PointCloud2` carries `header.stamp`, `frame_id`, and fields such as `x, y, z, intensity, ring, time`; the per-point `time` field is what makes sweep-level deskew possible. Ch 2's ego-state estimator provides the IMU, wheel, and odometry source for interpolated ego-pose ([[2_1_ego_state_estimation_EN|Ch 2 §2.1]] / [[2_2_gnss_ins_imu_fusion_EN|Ch 2 §2.2]]); `odom` and `map`-relative semantics come from [[2_3_lidar_localization_EN|Ch 2 §2.3]] and [[2_5_map_relative_localization_EN|Ch 2 §2.5]].
 
 ## Deskew
 
 A mechanical spinning LiDAR does not capture a full sweep at one instant. At 10 Hz, one revolution spans roughly 100 ms; at 20 m/s, `base_link` moves about 2 m during that sweep. Above parking-lot speeds, treating all points as if they share `header.stamp` bends poles, doubles nearby vehicles, and makes rectangular objects look like arcs. Deskew corrects this by transforming each point from its acquisition time to a common reference time, usually the end of the sweep or the midpoint, before downstream geometry sees the cloud.
 
-The pipeline uses the per-point timestamp, interpolates ego-pose from the Ch 2 source, and applies the relative transform:
+The pipeline uses the per-point timestamp, interpolates ego-pose from the Ch 2 source, and applies the relative transform. Following the convention that `T_a_b` denotes the transform from frame `b` to frame `a` (so `T_a_b * v_b = v_a`), and writing `T_world_base(t)` for the time-varying base-pose-in-world from the Ch-2 ego-pose stream:
 
 ```text
-p_common = T_common_base^-1 * T_point_base * T_base_lidar * p_lidar
+p_common = T_base_world(t_common) * T_world_base(t_point) * T_base_lidar * p_lidar
 ```
 
-The exact convention depends on whether the internal cloud is kept in `base_link`, `odom`, or `map`, but the invariant is the same: every point must describe the scene at the same reference time. In C++ systems this usually lives beside the driver or point-cloud preprocessor, implemented with TF2, Eigen transforms, and a time-indexed ego-pose buffer. Quaternion interpolation handles orientation; translation is usually linearly interpolated over the short sweep interval unless the ego-pose source already provides a continuous-time trajectory.
+where `T_base_world(t) = (T_world_base(t))^-1`. The result places each point in `base_link` at the common reference time. The choice of `base_link` (most common), `odom`, or `map` for the persisted frame is downstream-driven and only matters for §5.6 registration and §5.7 ROI gating, where map-relative work happens; the invariant is the same regardless: every point must describe the scene at the same reference time. In C++ systems this usually lives beside the driver or point-cloud preprocessor, implemented with TF2, Eigen transforms, and a time-indexed ego-pose buffer. Quaternion interpolation handles orientation; translation is usually linearly interpolated over the short sweep interval unless the ego-pose source already provides a continuous-time trajectory.
 
 Deskew is not SLAM. It consumes an ego-pose stream; it does not build a scan-to-map solution, which belongs to Ch 2 and to the registration depth in [[5_6_registration_EN|Ch 5 §5.6]]. The practical question here is latency and freshness. If `/tf` lags the point cloud by more than the interpolation buffer can cover, a perception node either blocks, falls back to an approximate transform, or marks the frame invalid. Each choice is visible later: stale deskew produces duplicated object surfaces, bad yaw interpolation produces curved lanes and guardrails, and missing per-point time silently converts a moving-vehicle problem into a static-sensor assumption.
 
@@ -61,7 +61,7 @@ Accumulation also changes latency semantics. A five-frame window at 10 Hz contai
 
 ## Voxel Downsampling
 
-Voxel downsampling controls compute by replacing many points inside a small 3D cell with one representative point, usually the centroid. PCL's `pcl::VoxelGrid` is the standard C++ workhorse: choose a leaf size, insert points into voxel bins, and emit one point per occupied voxel. This preserves the large-scale geometry needed by ground segmentation, clustering, and registration while reducing neighbor-search cost.
+Voxel downsampling controls compute by replacing many points inside a small 3D cell with one representative point. `pcl::VoxelGrid` emits the **centroid** of the points falling in each occupied voxel — set the leaf size via `setLeafSize(...)`, insert points, and PCL emits one centroid per occupied voxel. `pcl::ApproximateVoxelGrid` is a faster variant that snaps each point to its voxel-center coordinate rather than computing per-voxel centroids — a small precision loss for a noticeable speedup on dense clouds. This preserves the large-scale geometry needed by ground segmentation, clustering, and registration while reducing neighbor-search cost.
 
 Leaf size is an ODD decision, not a library default. A 0.05 m voxel may preserve curb and small-object detail but do little for CPU budget. A 0.20 m voxel may make a VLP-32 cloud cheap enough for real-time clustering but can erase cones, trailer legs, and pedestrian shape cues at range. Many systems use different leaf sizes for different branches: fine for near-field Generic Obstacle Detection and coarse for map subtraction or far-field occupancy.
 
@@ -74,32 +74,33 @@ Representations are the substrate before the algorithms appear. Ch 5 uses four c
 | representation | what it is | methods it enables | sensor topology assumptions | downstream Ch 5 use |
 |---|---|---|---|---|
 | raw point cloud | Unordered or lightly indexed `(x, y, z, intensity, ring, time)` points, usually queried by KD-tree or voxel hash. | SOR, ROR, PCL `VoxelGrid`, Euclidean clustering, RANSAC plane fitting, ICP-style registration. | Works for spinning, MEMS, flash-derived, and fused clouds if timestamps and frames are valid. | This section, [[5_2_ground_segmentation_EN|Ch 5 §5.2]], [[5_3_clustering_EN|Ch 5 §5.3]], [[5_6_registration_EN|Ch 5 §5.6]]. |
-| voxel grid | 3D cells with representative points, counts, occupancy, or statistics. OctoMap extends this idea into probabilistic octree memory. | Downsampling, occupancy update, free-space carving, map subtraction, coarse clustering, registration acceleration. | Works across topologies after points are transformed into a common frame; resolution must match range and ODD. | This section, [[5_6_registration_EN|Ch 5 §5.6]], [[5_7_occupancy_freespace_map_roi_EN|Ch 5 §5.7]]. |
+| voxel grid | 3D cells on a flat grid with representative points, counts, or statistics. | Downsampling (`pcl::VoxelGrid`), coarse clustering, registration acceleration via cell hashing. | Works across topologies after points are transformed into a common frame; resolution must match range and ODD. | This section, [[5_6_registration_EN|Ch 5 §5.6]]. |
+| probabilistic octree (OctoMap) | Hierarchical octree of log-odds occupancy; coarse cells subdivide into eight children only where occupancy varies. Hornung 2013. | Probabilistic occupancy update, free-space ray carving, multi-resolution map memory. | Same frame requirements as voxel grid; the multi-resolution structure is the central benefit, not a flat-grid extension. | [[5_7_occupancy_freespace_map_roi_EN|Ch 5 §5.7]]. |
 | range image | 2D spherical projection indexed by azimuth and elevation or ring. Pixel values store range, height, intensity, or labels. | Scan-line ground segmentation, depth-jump segmentation, range-image connected components, fast neighborhood tests. | Strongest for repeating-ring spinning LiDAR; non-repetitive sensors need re-projection and can create holes or artificial adjacency. | [[5_2_ground_segmentation_EN|Ch 5 §5.2]] and [[5_3_clustering_EN|Ch 5 §5.3]]. |
-| BEV grid | Top-down raster over the ground plane with channels such as max height, mean height, density, occupancy, distance, angle, or intensity. | Occupancy grids, HD-map ROI gating, connected components in drivable area, hand-engineered channels that foreshadow Ch 6 BEV models. | Best when points are gravity-aligned and map or `odom` alignment is reliable; works for single or multi-LiDAR after extrinsics. | [[5_7_occupancy_freespace_map_roi_EN|Ch 5 §5.7]] and the Ch 6 handoff. |
+| BEV grid | Top-down raster over the ground plane with channels such as max height, mean height, density, occupancy, distance, angle, or intensity. | Occupancy grids, HD-map ROI gating, connected components in drivable area. (The *learned* PointPillars-class encoders that consume BEV grids are out of scope for Ch 5; see [[6_3_pointpillars_EN|Ch 6 §6.3]] for that handoff.) | Best when points are gravity-aligned and map or `odom` alignment is reliable; works for single or multi-LiDAR after extrinsics. | [[5_7_occupancy_freespace_map_roi_EN|Ch 5 §5.7]]. |
 
 The representation choice should happen before tuning algorithm thresholds. A DBSCAN threshold that looks wrong on raw points may be fine on a voxel grid; a range-image split that works on a Velodyne ring pattern may fail on a non-repetitive MEMS scan; a BEV occupancy cell that is useful for free-space can be too coarse for L-shape fitting. Most production systems keep more than one branch because no single representation is optimal for all of `preprocess → ground → cluster → fit → track`.
 
-> [!warning] Failure modes
-> - id: `5_1.fm.rain_spray_ghosts`
->   cause: Rain, tire spray, fog, or exhaust creates short-lived but geometrically plausible returns that pass simple SOR/ROR thresholds.
->   observable_symptom: Small clusters appear near wheels, behind trucks, or in wet road spray, often with unstable frame-to-frame positions.
->   downstream_hazard: Clustering and tracking can promote the returns into false obstacles, causing braking, path blockage, or unnecessary lane-change suppression.
->   mitigation: Use range-aware outlier thresholds, return-selection policy, temporal consistency checks, weather-specific monitors, and a conservative separation between obstacle detections and free-space clearing.
->   validation_test: Replay wet-road and truck-spray scenarios with ground-truth free-space review and measure false obstacle persistence, not only per-frame mAP.
-> - id: `5_1.fm.deskew_failure_doubling`
->   cause: Missing per-point `time`, stale TF2 transforms, or incorrect ego-pose interpolation transforms different parts of one sweep to inconsistent `base_link` poses.
->   observable_symptom: Cars, poles, lane boundaries, or guardrails appear doubled, curved, or torn along the scan direction.
->   downstream_hazard: Ground segmentation, clustering, and shape fitting split one actor into multiple objects or fit planner-hostile boxes with incorrect yaw and extent.
->   mitigation: Enforce per-point timestamp presence, monitor `/tf` age, reject frames outside the ego-pose interpolation window, and validate deskew on high-yaw-rate logs.
->   validation_test: Run turning, braking, and highway-speed rosbag scenarios with deskew on/off comparisons and require stable cluster count and object extent.
-> - id: `5_1.fm.intensity_misclassification`
->   cause: A rule treats intensity as material identity even though intensity shifts with range, incidence, aperture, firmware, weather, and sensor family.
->   observable_symptom: Wet asphalt, retroreflective signs, dark vehicles, or replacement sensors change class-like decisions without a corresponding geometry change.
->   downstream_hazard: Lane marking, reflector, ROI, or obstacle filters suppress real objects or create false semantic cues for downstream modules.
->   mitigation: Use intensity only as an auxiliary feature, calibrate and monitor distributions per sensor and ODD, and keep geometry-based fallbacks active.
->   validation_test: Compare dry/wet, near/far, multi-incidence, and cross-sensor logs while checking that decisions do not depend on an uncalibrated intensity threshold.
+### 5.1.x Output contract for downstream sections
+
+§5.1 publishes a deskewed, de-noised, voxel-downsampled `PointCloud2` in `base_link` at sweep-end time. Branch policy:
+
+| consumer | input expected | preprocessing applied |
+|---|---|---|
+| [[5_2_ground_segmentation_EN\|§5.2]] ground segmentation | full preprocessed cloud (deskewed, SOR/ROR, height-gated, voxel-downsampled at the ground-seg leaf size) | optional projection to a range image when scan-line methods (Himmelsbach) or range-image connected components are used |
+| [[5_3_clustering_EN\|§5.3]] clustering | residual non-ground cloud from §5.2 | inherits §5.2's preprocessing |
+| [[5_6_registration_EN\|§5.6]] registration | same preprocessed cloud, voxel-downsampled at the **registration** leaf size (typically coarser than ground-seg) | source for ICP/NDT/GICP and for map-subtraction registration |
+| [[5_7_occupancy_freespace_map_roi_EN\|§5.7]] occupancy + ROI gating | BEV projection of the preprocessed cloud at the BEV cell resolution | downsampling at the BEV cell resolution |
+
+A pipeline may keep multiple branches active simultaneously (one for ground/clustering, one for registration, one for occupancy) because no single leaf size or representation is optimal for every downstream stage.
+
+> [!warning] Failure modes for §5.10 catalog
+> | id | cause | observable_symptom | downstream_hazard | mitigation | validation_test |
+> |---|---|---|---|---|---|
+> | `5_1.fm.rain_spray_ghosts` | Rain, tire spray, fog, or exhaust creates short-lived but geometrically plausible returns that pass simple SOR/ROR thresholds. | Small clusters appear near wheels, behind trucks, or in wet road spray, with unstable frame-to-frame positions. | Clustering and tracking promote the returns into false obstacles, causing braking, path blockage, or unnecessary lane-change suppression. | Range-aware outlier thresholds, return-selection policy, temporal consistency checks, weather-specific monitors, conservative separation between obstacle detections and free-space clearing. | Replay wet-road and truck-spray scenarios with ground-truth free-space review and measure false-obstacle persistence (not only per-frame mAP). |
+> | `5_1.fm.deskew_failure_doubling` | Missing per-point `time`, stale TF2 transforms, or incorrect ego-pose interpolation transforms different parts of one sweep to inconsistent `base_link` poses. | Cars, poles, lane boundaries, or guardrails appear doubled, curved, or torn along the scan direction. | Ground segmentation, clustering, and shape fitting split one actor into multiple objects or fit planner-hostile boxes with incorrect yaw and extent. | Enforce per-point timestamp presence, monitor `/tf` age, reject frames outside the ego-pose interpolation window, validate deskew on high-yaw-rate logs. | Run turning, braking, and highway-speed rosbag scenarios with deskew-on/off comparisons; require stable cluster count and object extent. |
+> | `5_1.fm.intensity_misclassification` | A rule treats intensity as material identity even though intensity shifts with range, incidence, aperture, firmware, weather, and sensor family. | Wet asphalt, retroreflective signs, dark vehicles, or replacement sensors change class-like decisions without a corresponding geometry change. | Lane-marking, reflector, ROI, or obstacle filters suppress real objects or create false semantic cues for downstream modules. | Use intensity only as an auxiliary feature; calibrate and monitor distributions per sensor and ODD; keep geometry-based fallbacks active. | Compare dry/wet, near/far, multi-incidence, and cross-sensor logs; check that decisions do not depend on an uncalibrated intensity threshold. |
 
 | stage | compute | frame_rate_assumption | point_count_assumption | latency_p50_ms | latency_p99_ms | memory_mb | cadence | tf_freshness_assumption | assumptions_and_caveats |
 |---|---|---|---|---|---|---|---|---|---|
-| `5_1_pointcloud_preprocessing` | cpu | 10 Hz mechanical spinning LiDAR | VLP-32 at ~600k pts/s sustained, ~60k pts/frame before filtering | 6 | 18 | 96 | every-frame | ≤ 50 ms | Single roof LiDAR; C++ ROS2 node with deskew, SOR/ROR, clipping, optional 3-frame accumulation branch, and PCL `VoxelGrid`; no learned voxelization; latency excludes driver packet parsing and downstream ground segmentation. |
+| `5_1_pointcloud_preprocessing` | cpu | 10 Hz mechanical spinning LiDAR | VLP-32C in **single-return** mode at ~600k pts/s sustained, ~60k pts/frame before filtering (dual-return roughly doubles both) | ~6 | ~18 | ~96 | every-frame | ≤ 50 ms | **Illustrative** budget for a single-roof-LiDAR C++ ROS2 node on a Jetson-Orin-class CPU running deskew + SOR/ROR + clipping + optional 3-frame accumulation branch + PCL `VoxelGrid`; no learned voxelization; latency excludes driver packet parsing and downstream ground segmentation. Per-deployment numbers vary with sensor / CPU class / accumulation cadence and should be measured rather than assumed. |
