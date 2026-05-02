@@ -2,8 +2,8 @@
 title: Workflow state snapshot
 doc_type: state-snapshot
 state_kind: manual_snapshot
-last_updated: 2026-05-02T09:08:39.473Z
-last_checked_commit: d68b4700dc81b05198ce6936725c4a759ac92377
+last_updated: 2026-05-02T17:00:00.000Z
+last_checked_commit: 8dd9cc2
 generated_from: main_session
 ---
 
@@ -14,25 +14,25 @@ generated_from: main_session
 
 ## Mechanical state (auto-refreshed by PreCompact hook)
 
-- last_known_head: `d68b4700dc81b05198ce6936725c4a759ac92377`
-- worktree_status: dirty (main: 5 entries; codex worktree: 2 entries)
+- last_known_head: `8dd9cc2`
+- worktree_status: clean (main: clean; codex worktree: clean but stale at `e9b63ce` — needs re-ff before Batch 3 dispatch)
 - active_batch_sentinel: null
 
 ## Reasoning state (main session updates manually)
 
 - active_chapter: 5 (Classical LiDAR Detection)
-- active_phase: 4 (per-section drafting), Batch 1 closed; Batch 2 pending dispatch
-- active_batch: Ch 5 Phase-4 Batch 2 — pending dispatch (5 writers in parallel: §5.2 codex, §5.3 codex, §5.4 cc, §5.5 codex, §5.7 cc)
-- last_agreed_commit: `96d782a` — `agreed(5/5_8_ros2_integration): per-section deal-loop complete`
-- next_action: Run the prompt in `_workflow/next_session_cue.md` to dispatch Ch 5 Phase-4 Batch 2. Verify infra (clean main, ff-only worktree, no stale sentinel) first.
+- active_phase: 4 (per-section drafting); Batch 1 closed; **Batch 2 closed** — all 5 sections at Phase-5 AGREED. Batch 3 (§5.9 deployment alone) pending dispatch, awaiting user checkpoint per cue Step 6.
+- active_batch: none — Batch 2 just closed
+- last_agreed_commit: `8dd9cc2` — `agreed(5/5_7_occupancy_freespace_map_roi): per-section deal-loop complete`
+- next_action: **Pause and tell user.** All 5 Batch-2 sections (§5.2, §5.3, §5.4, §5.5, §5.7) are at Phase-5 AGREED. Per `_workflow/next_session_cue.md` Step 6, the next natural step is Batch 3 (§5.9 deployment, the runtime-budget synthesizer that depends on the §§5.1–5.8 rows now committed) — but Batch 3 dispatch should pause for explicit user approval first. After user approves, infrastructure check (clean main, ff-only worktree, no stale sentinel) → dispatch §5.9 cc-writer alone.
 
 ### open_conflict_threads
 
-(none — STATE.md design just landed AGREED at `<this commit>`; codex thread for STATE.md was the most recent and is closed)
+(none — all 5 Batch-2 deal-loops closed at AGREED; no in-flight CONFLICT threads)
 
 ### blocked_user_inputs
 
-(none — per `feedback_user_role_in_phases.md`, codex AGREED is the decision; only genuinely user-only inputs would appear here)
+(none — per `feedback_user_role_in_phases.md`, codex AGREED is the decision; the only thing pending user input is the Batch 3 dispatch checkpoint, which is a workflow checkpoint, not a content decision)
 
 ### do_not_redo
 
@@ -42,9 +42,10 @@ Short bullets of completed work that is not obvious from `next_action` or the la
 - Lockstep §5.4 insertion + §5.7 rename — applied at commit `8653e90` (TOC + EN/ZH overviews + README + CLAUDE.md cross-cutting threads).
 - Phase 3 chapter plan at `_workflow/plans/ch5_chapter_plan.md` — AGREED at commit `e9b63ce`. 11-section chapter, 4 batches, 5cc:5codex writer ratio.
 - ZH filename convention — Chinese slugs for `_ZH.md` overviews — applied at commit `ec5ad8b`. README §2 + memory `reference_zh_filename_convention.md` + 13 file renames + 93 wikilink rewrites.
-- Ch 5 Phase-4 Batch 1 drafts (§5.1, §5.6, §5.8) — Phase 5 AGREED at commits `6392e15`, `f29f2ba`, `96d782a`. cc-writer drafted §5.6; codex-writer drafted §5.1 and §5.8 (each got Rule 3b gemini factual spot-check + Rule 3c codex-bias checklist).
-- Codex worktree at `../auto-driving-codex-worktree` is on branch `codex-writer-isolated`. Was fast-forwarded to `e9b63ce` before Batch 1 dispatch; needs re-ff before Batch 2.
-- Memory rules established this session: `feedback_user_role_in_phases.md` (codex AGREED is the decision; no human review; no open questions for user) and `reference_zh_filename_convention.md` (Chinese slugs for `_ZH.md` files). New `feedback_state_md_discipline.md` lands with this commit.
+- Ch 5 Phase-4 **Batch 1** drafts (§5.1, §5.6, §5.8) — Phase 5 AGREED at commits `6392e15`, `f29f2ba`, `96d782a`. cc-writer drafted §5.6; codex-writer drafted §5.1 and §5.8 (each got Rule 3b gemini factual spot-check + Rule 3c codex-bias checklist).
+- Ch 5 Phase-4 **Batch 2** drafts (§5.2, §5.3, §5.4, §5.5, §5.7) — Phase 5 AGREED at commits `5046122`, `acd529b`, `0ccaf75`, `d99806a`, `8dd9cc2`. cc-writer drafted §5.4 + §5.7; codex-writer drafted §5.2, §5.3, §5.5 (each got Rule 3b gemini factual spot-check — §5.2 needed Patchwork++ revision, §5.3 + §5.5 PASS — and Rule 3c codex-bias checklist). Deal-loop rounds: §5.2 (3), §5.3 (4), §5.4 (5), §5.5 (4), §5.7 (6). §5.4 / §5.7 needed extra rounds because of contract-side-channel design (§5.4 / §5.5 contract: `extent_source`, `class_prior_source`, `yaw_confidence`, `corner_visibility` ride alongside the binding tuple) and ROI/GOD-boundary policy consistency across §5.7's six reference points.
+- Codex worktree at `../auto-driving-codex-worktree` is on branch `codex-writer-isolated`, currently at `e9b63ce` (was ff'd before Batch 2 dispatch); 3 codex-writer round-1 drafts (§5.2 / §5.3 / §5.5) live there as untracked files identical to `wip(5/5_X_*)` commits in main; needs re-ff before Batch 3 dispatch.
+- Memory rules established earlier: `feedback_user_role_in_phases.md` (codex AGREED is the decision; no human review; no open questions for user), `reference_zh_filename_convention.md` (Chinese slugs for `_ZH.md` files), `feedback_state_md_discipline.md` (STATE.md is fast-recovery snapshot, NOT source of truth).
 
 ## Recovery checklist after `/clear` or `/compact`
 
