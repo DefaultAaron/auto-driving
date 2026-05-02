@@ -75,7 +75,7 @@ The vault uses a five-actor team and a six-phase per-chapter pipeline. Verbose a
 **Important constraints:**
 - Codex-collaborator is the **sole** conflictor. Do not add Gemini as a second adversary.
 - `codex-collaborator` is read-only (no `--write`); `gemini-researcher` runs in `--approval-mode plan`. Only `codex-writer` runs Codex with `--write`, and only inside the sacrificial worktree.
-- Project-scoped subagents are loaded at session start. After editing `.claude/agents/` or `.claude/settings.json`, the user must restart the Claude Code session.
+- Project-scoped subagents and `.claude/settings.json` hook changes are normally picked up automatically by Claude Code's file watcher. After editing those files, run `/hooks` to verify the new entries are visible; restart the Claude Code session only if they are not picked up.
 - The full-repo `git status --porcelain` clean-state precondition (§6.1 of the spec) means the user must commit/stash any in-progress edits across the entire vault before main session can dispatch a writer batch.
 
 **Modification discipline (load-bearing — see `feedback_workflow_discipline.md` + `feedback_update_in_lockstep.md` in project memory):**
@@ -84,6 +84,8 @@ The vault uses a five-actor team and a six-phase per-chapter pipeline. Verbose a
 - **When you do change anything substantive, update memory + CLAUDE.md + README + TOC + affected chapter overviews together** so the four sources never drift. Memory and CLAUDE.md stay concise; README is the verbose authoritative plan; `_workflow/subagents_design.md` is the verbose authoritative workflow spec.
 
 A `UserPromptSubmit` hook at `.claude/hooks/codex_conflict_reminder.sh` injects a reminder of this discipline on every prompt. The hook is a reminder, not enforcement — the discipline still lives in the rule above.
+
+**Live workflow state — `_workflow/STATE.md`:** a fast-recovery snapshot of where the vault is in the per-chapter pipeline (active phase, active batch, next action, open CONFLICT threads, do-not-redo notes). **NOT a source of truth** — verify against `git log` and section frontmatter before acting. Mechanical fields are auto-refreshed by the `PreCompact` hook (`.claude/hooks/snapshot_state.mjs`); reasoning fields are updated by main session at each AGREED commit, each WIP commit, and at session end. A `SessionStart` hook (matchers `clear` + `compact`) emits a one-line reminder to read STATE.md after context loss. See `feedback_state_md_discipline.md` in project memory.
 
 ## Working in the vault
 

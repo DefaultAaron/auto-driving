@@ -21,6 +21,28 @@
           }
         ]
       }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/snapshot_state.mjs"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/state_recovery_reminder.sh"
+          }
+        ]
+      }
     ]
   }
 }
