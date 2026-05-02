@@ -3,7 +3,7 @@ chapter: 5
 section: 6
 title: Registration — ICP / NDT / GICP
 language: EN
-workflow_status: draft
+workflow_status: reviewing
 tags:
   - book/section
   - book/chapter-5
@@ -19,7 +19,7 @@ You saw these names in [[2_3_lidar_localization_EN|Ch 2 §2.3]]; here is how the
 
 ## Prerequisites, restated inline
 
-Registration aligns one point cloud to another. To talk about that alignment cleanly we need three things from earlier chapters: the TF2 tree relating the `lidar` frame to `base_link` and `base_link` to `map` ([[1_1_coordinate_frames_and_tf2_EN|Ch 1 §1.1]]); a source of ego-pose at the timestamp of each sweep ([[2_1_ego_state_estimation_EN|Ch 2 §2.1]]); and the canonical representations introduced in [[5_1_pointcloud_preprocessing_EN|§5.1]] — raw point cloud, voxel grid, range image, BEV. ICP operates on raw point clouds; NDT operates on a voxel-grid representation of the target; GICP operates on raw points augmented with per-point covariances.
+Registration aligns one point cloud to another. To talk about that alignment cleanly we need three things from earlier chapters: the TF2 tree relating the `lidar` frame to `base_link` and `base_link` to `map` ([[1_1_coordinate_frames_EN|Ch 1 §1.1]]); a source of ego-pose at the timestamp of each sweep ([[2_1_ego_state_estimation_EN|Ch 2 §2.1]]); and the canonical representations introduced in [[5_1_pointcloud_preprocessing_EN|§5.1]] — raw point cloud, voxel grid, range image, BEV. ICP operates on raw point clouds; NDT operates on a voxel-grid representation of the target; GICP operates on raw points augmented with per-point covariances.
 
 Throughout this section, "source" is the live cloud being aligned and "target" is the cloud (or map) it is being aligned to. The output is a rigid transform `T ∈ SE(3)` that maps source-frame points into the target frame.
 
@@ -56,13 +56,14 @@ Iterate until the transform stops changing. The two variants differ only in the 
 
 Magnusson's 2009 thesis is the canonical reference for the 3-D NDT used in production AD. The idea is to throw away individual target points and replace each voxel by its **per-cell normal distribution** — a mean `μ_c` and covariance `Σ_c` fit to the points falling inside cell `c`. The target then becomes a sum of Gaussians defined over space.
 
-Given a transform `T`, each transformed source point `T·p_i` lands in some target cell `c(i)`. NDT minimizes the negative log-likelihood of the source under the target's piecewise-Gaussian density:
+Given a transform `T`, each transformed source point `T·p_i` lands in some target cell `c(i)`. NDT defines a **score function** that is the sum of un-normalized Gaussian responses of each transformed source point against its target cell, and *maximizes* the score (equivalently, minimizes its negative):
 
 ```
-E_ndt(T) = − Σ_i exp( − ½ (T·p_i − μ_{c(i)})ᵀ Σ_{c(i)}⁻¹ (T·p_i − μ_{c(i)}) )
+S_ndt(T) = Σ_i exp( − ½ (T·p_i − μ_{c(i)})ᵀ Σ_{c(i)}⁻¹ (T·p_i − μ_{c(i)}) )
+E_ndt(T) = − S_ndt(T)
 ```
 
-(The exponential, rather than the raw quadratic, is the form Magnusson uses to keep the score bounded and to soften the influence of outliers. Modern implementations add small regularizers to `Σ_c` for stability when a cell sees few points.)
+This is **not** a negative log-likelihood — taking `−log` of a single un-normalized Gaussian would yield the quadratic form, which is what ICP point-to-point already minimizes. Magnusson's score keeps each point's contribution **bounded** (`exp(−large) ≈ 0`), so far-from-any-Gaussian outliers contribute almost nothing rather than dominating the sum. Modern implementations add small regularizers to `Σ_c` for stability when a cell sees few points.
 
 Two practical consequences flow from this:
 
@@ -81,7 +82,7 @@ E_gicp(T) = Σ_i d_iᵀ ( C^B_i + T C^A_i Tᵀ )⁻¹ d_i ,    d_i = T·p_i − 
 
 The information matrix `( C^B_i + T C^A_i Tᵀ )⁻¹` weights each correspondence by how confident the local geometry is along each direction. Pick the source and target covariances to be isotropic and you recover point-to-point ICP; pick them to be highly anisotropic along surface normals (i.e. "infinite" tangentially, "small" along the normal) and you recover point-to-plane. The probabilistic formulation is the common parent.
 
-In practice this means GICP handles **partial-overlap and locally-planar regions** more gracefully than either parent, at the cost of estimating per-point covariances and inverting them every iteration. Production SLAM stacks (FAST-LIO and LIO-SAM use GICP-flavored sub-modules at the SLAM level — see [[2_6_slam_essentials_EN|Ch 2 §2.6]]) routinely choose GICP when compute allows.
+In practice this means GICP handles **partial-overlap and locally-planar regions** more gracefully than either parent, at the cost of estimating per-point covariances and inverting them every iteration. Production perception pipelines routinely choose GICP when compute allows; tightly coupled SLAM stacks integrate registration differently — FAST-LIO uses an iterated EKF with point-to-plane LiDAR residuals, LIO-SAM uses scan-to-map matching inside a factor-graph backend — see [[2_6_slam_essentials_EN|Ch 2 §2.6]].
 
 > [!tip] Choosing between the three
 > If you already have a good prior and a structured scene, point-to-plane ICP is the cheapest and fastest. If you need a larger basin of convergence (e.g., relocalizing into a prior map after a brief outage), prefer NDT. If you can afford the per-point covariance work and need robustness on partial overlap or anisotropic geometry, GICP is the production default.
