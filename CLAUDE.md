@@ -87,6 +87,8 @@ A `UserPromptSubmit` hook at `.claude/hooks/codex_conflict_reminder.sh` injects 
 
 **Live workflow state — `_workflow/STATE.md`:** a fast-recovery snapshot of where the vault is in the per-chapter pipeline (active phase, active batch, next action, open CONFLICT threads, do-not-redo notes). **NOT a source of truth** — verify against `git log` and section frontmatter before acting. Mechanical fields are auto-refreshed by the `PreCompact` hook (`.claude/hooks/snapshot_state.mjs`); reasoning fields are updated by main session at each AGREED commit, each WIP commit, and at session end. A `SessionStart` hook (matchers `clear` + `compact`) emits a one-line reminder to read STATE.md after context loss. See `feedback_state_md_discipline.md` in project memory.
 
+**Cue / STATE.md authority:** `_workflow/next_session_cue.md` is the paste-able multi-step prompt for fresh sessions and updates at coarse checkpoints (phase / batch / session boundaries); STATE.md is the live status and updates at every WIP / AGREED commit. **STATE.md is authoritative on conflict.** The cue's `for_commit` frontmatter field flags staleness — compare to current HEAD per the rules in `feedback_state_md_discipline.md` before pasting; if stale, trust STATE.md `next_action`. Past cues are recoverable from git log (`git show <sha>:_workflow/next_session_cue.md`); no `_workflow/archive/` folder.
+
 ## Working in the vault
 
 - Prefer Obsidian Flavored Markdown features (wikilinks `[[Note]]`, embeds `![[Note]]`, callouts, frontmatter properties, tags) over plain Markdown when authoring notes — see the `obsidian:obsidian-markdown` skill.

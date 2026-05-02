@@ -54,3 +54,4 @@ Short bullets of completed work that is not obvious from `next_action` or the la
 4. Read `next_action` above; cross-check it against the latest commits via `git log --oneline -10`.
 5. If `active_batch_sentinel` is non-null, a writer batch is in flight — do NOT dispatch a new batch; first read the sentinel and check both repos for in-scope vs out-of-scope writes per spec §6.4.
 6. If `open_conflict_threads` is non-empty, a CONFLICT loop is mid-iteration — resume that thread with `RESUME: true` before starting any new work.
+7. If `_workflow/next_session_cue.md` exists, compare its `for_commit` to current HEAD: if HEAD == `for_commit`, or 1–2 commits ahead with only `wip(...)` between them, the cue is current and safe to paste; otherwise the cue is **stale** and STATE.md `next_action` is authoritative.

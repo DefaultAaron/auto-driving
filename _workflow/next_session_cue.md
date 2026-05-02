@@ -3,12 +3,16 @@ title: Next-session cue — Ch 5 Phase-4 Batch 2 dispatch
 doc_type: workflow-cue
 status: pending
 created: 2026-05-02
+for_commit: d3a24eb
 tags: [workflow, pilot, ch5, batch-2]
 ---
 
 # Next-session cue — Ch 5 Phase-4 Batch 2 dispatch
 
-When the user starts a fresh Claude Code session after the Ch 5 Batch-1 close (commits up through `96d782a agreed(5/5_8_ros2_integration)`), this is the first prompt to run. Paste it verbatim.
+> [!warning] Freshness check before pasting
+> This cue updates only at coarse checkpoints (phase / batch / session boundaries). The live workflow status lives in [[STATE|`_workflow/STATE.md`]] and updates at every WIP / AGREED commit. **Before pasting:** compare this cue's `for_commit` (`d3a24eb`) against `git rev-parse HEAD`. If HEAD is `for_commit` exactly, or 1–2 commits ahead with only `wip(...)` between them, the cue is current. If HEAD is more commits ahead OR includes any `agreed(...)` / `plan(...)` / `chapter(...)` / `lockstep(...)` since `for_commit`, treat this cue as **stale** and use STATE.md `next_action` instead.
+
+When the user starts a fresh Claude Code session after the Ch 5 Batch-1 close (commits up through `96d782a agreed(5/5_8_ros2_integration)`) and the STATE.md / hooks lockstep at `d3a24eb`, this is the first prompt to run. Paste it verbatim.
 
 ## Paste this
 
