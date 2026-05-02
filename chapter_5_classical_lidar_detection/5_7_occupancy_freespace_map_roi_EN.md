@@ -77,7 +77,8 @@ The C++ pseudocode is small enough to write inline:
 // hd_map_roi_lookup.cpp (sketch)
 // Precomputed at tile load:
 //   roi_grid_(i, j) = 1 if cell center lies inside any drivable polygon, else 0.
-// On the hot path, called per cluster or per occupancy component:
+// On the hot path, called per **primary-detection** cluster only —
+// the occupancy / GOD fallback runs on an ungated domain.
 bool IsInROI(const Eigen::Vector3d& p_map) const {
   const int i = static_cast<int>((p_map.x() - origin_x_) / cell_size_);
   const int j = static_cast<int>((p_map.y() - origin_y_) / cell_size_);
