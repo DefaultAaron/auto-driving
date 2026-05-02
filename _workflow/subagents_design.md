@@ -1,6 +1,8 @@
 ---
 title: Subagents design — the autonomous-driving book
-workflow_status: design-draft
+doc_type: workflow-spec
+status: agreed
+agreed_on: 2026-05-02
 last_updated: 2026-05-02
 tags: [workflow, subagents, design]
 ---
