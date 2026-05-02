@@ -1,0 +1,127 @@
+---
+chapter: 5
+section: 7
+title: Occupancy, free-space & map-aided ROI gating
+language: EN
+workflow_status: reviewing
+tags:
+  - book/section
+  - book/chapter-5
+  - lang/EN
+---
+
+# 5.7 Occupancy, free-space & map-aided ROI gating
+
+This section unifies two classical machineries that Ch 5 has been pointing at since [[5_1_pointcloud_preprocessing_EN|§5.1]]: probabilistic **occupancy grids** (with their 3-D extension **OctoMap**, free-space ray carving, and the Generic Obstacle Detection fallback) and **HD-map ROI gating** (Apollo's HDMap polygon lookup table and Autoware's `compare_map_segmentation`). Treating them in the same section is a deliberate pedagogical choice. Both consume the BEV grid substrate from §5.1; both depend on registration roles 3 and 4 from [[5_6_registration_EN|§5.6]] for the map-relative frame to mean what we say it means; and both are the load-bearing classical pieces that survive *inside* DL-primary stacks. The unification earns its place when we get to the failure-mode catalog: every interesting failure here is a story about how the occupancy half and the ROI half couple — a stale HD map suppresses a real actor that a class-agnostic occupancy fallback would have caught, or localization drift offsets the ROI cells relative to the live cloud and the occupancy update writes evidence into the wrong row of the grid. Teaching one half without the other obscures the safety story.
+
+> [!abstract] What this section covers
+> Recursive Bayesian occupancy in log-odds form on a 2-D BEV grid; OctoMap (Hornung 2013) as the same math lifted to a hierarchical 3-D octree; free-space carving via ray casting; **Generic Obstacle Detection** as the class-agnostic safety fallback that sits underneath the per-class detector; **Apollo HDMap ROI gating** as a precomputed BEV lookup; Autoware's `compare_map_segmentation` as the registration-dependent map-subtraction pattern (Role 2 from §5.6); failure modes that span both halves; one paragraph on why this combination survives inside DL-primary stacks. Out of scope: HD-map *building* ([[2_7_hd_map_management_EN|Ch 2 §2.7]]), learned occupancy networks (Tesla-style; [[6_0_overview_EN|Ch 6]]), and pure semantic free-space segmentation.
+
+## Prerequisites, restated inline
+
+The BEV grid substrate is the one introduced in [[5_1_pointcloud_preprocessing_EN|§5.1]]'s representation map: a top-down raster over the gravity-aligned ground plane, indexed by `(i, j)` cells of width `r` (typical `r = 0.1 m` to `0.4 m`), with channels for max height, density, occupancy, and so on. Frames follow [[1_1_coordinate_frames_EN|Ch 1 §1.1]]: the live cloud arrives in `lidar` and is transformed into `base_link` (sensor extrinsics) and then into `map` for any operation that touches a prior map. The "`map` frame" assumption is exactly what [[2_5_map_relative_localization_EN|Ch 2 §2.5]] provides — a globally consistent frame whose origin is fixed to a surveyed reference and in which HD-map polygons are authored. HD-map *freshness* and *change detection* (was this junction repainted last week?) is the responsibility of [[2_7_hd_map_management_EN|Ch 2 §2.7]]; this section consumes a map that may be stale and treats staleness as a failure mode. Registration roles 3 (multi-frame accumulation alignment) and 4 (map-aided ROI consistency) from [[5_6_registration_EN|§5.6]] supply the alignment the occupancy update and the ROI lookup both depend on.
+
+## 2-D occupancy grids in log-odds
+
+An occupancy grid stores, for each BEV cell `c`, the posterior probability `p(c | z_{1:t})` that the cell is occupied given all sensor measurements up to time `t`. The classical recursive Bayes update is more convenient in **log-odds** form because the recursion becomes a sum:
+
+```text
+l(c | z_{1:t}) = l(c | z_{1:t-1}) + l(c | z_t) − l_0
+```
+
+where `l(p) = log( p / (1 − p) )` is the log-odds transform of a probability `p`, `l_0 = l(p_0)` is the log-odds of the prior occupancy (typically `p_0 = 0.5`, so `l_0 = 0`), and `l(c | z_t)` is the log-odds the **sensor model** assigns to cell `c` from the current measurement alone. Adding two log-odds values is equivalent to multiplying odds, which is what Bayes' rule does under the standard cell-independence assumption.
+
+The sensor model is two numbers in the simplest form: `l_occ` (positive) for cells that received a hit and `l_free` (negative) for cells a ray passed through without hitting. A cell that the current sweep does not see at all gets no update — its log-odds carry forward unchanged, decaying only if an explicit forgetting term is applied. Probabilities are recovered by the inverse transform `p = 1 / (1 + exp(−l))` whenever a downstream consumer (planner, visualizer) needs them; the filter itself never converts.
+
+Two practical details govern stability. **Clamping** caps `l(c)` to a fixed interval `[l_min, l_max]`; without it, a wall observed for a thousand sweeps accumulates a log-odds value so high that one bad measurement can never erase it, and a pedestrian who steps in front of that wall is denied because the grid "knows" the cell is permanent. OctoMap's defaults of `l_min ≈ −2` and `l_max ≈ 3.5` are a reasonable starting point and trade slow forgetting for stable maps. **Initialization** at `l_0 = 0` (probability `0.5`) means an unobserved cell is neither occupied nor free; treating unobserved as free is a classical bug that produces phantom drivable area beyond the sensor horizon.
+
+> [!tip]
+> A cell whose log-odds has saturated at `l_max` for hours is not the same as a cell whose log-odds just crossed the occupancy threshold. Downstream consumers that need this distinction (e.g., Generic Obstacle Detection wanting only *fresh* hits) should read the timestamp of last update alongside the log-odds value, not just the binary thresholded grid.
+
+## Free-space carving via ray casting
+
+Free-space comes from ray casting, not from the absence of returns. For every laser ray, the cells along the segment from the sensor origin to the first hit are *cleared* (their log-odds receive `l_free`), and the cell containing the hit is *occupied* (it receives `l_occ`). Cells beyond the hit are not touched — the ray did not see through the surface. Bresenham-style line traversal in 2-D, or the 3-D variant for OctoMap, enumerates the cells a ray crosses in `O(L / r)` time per ray, where `L` is the ray length and `r` is the cell size.
+
+Ray casting is what makes the grid learn drivable area in the classical sense. After a few sweeps along a clear road, the cells in front of the vehicle accumulate negative log-odds and cross the *free* threshold; obstacle cells stay positive; never-observed cells stay near zero. A planner can then read "drivable area" as cells with `l(c) < l_free_thresh` *and* a recent update timestamp.
+
+The free-space carving operation is also where the classical occupancy framework gets its safety guarantee: a cell is declared free only because a specific ray passed through it without hitting anything. There is no inference from "I have not seen an obstacle here" — the absence of evidence is not evidence of absence. This is the load-bearing distinction between an honest occupancy grid and a map that quietly assumes the unseen world is empty.
+
+## OctoMap — the same math, lifted to 3-D
+
+Hornung et al. introduced OctoMap in 2013 as a probabilistic 3-D occupancy mapping framework backed by an octree. The pedagogical claim is that OctoMap is **the recursive Bayes occupancy update of the previous subsection, lifted from a flat 2-D BEV grid to a hierarchical 3-D octree**. The log-odds update equation is identical; what changes is the spatial container and how cells subdivide.
+
+An octree partitions space into cubic cells; each cell either stores a leaf log-odds value or has eight children. OctoMap stores log-odds at every level, and a cell subdivides into eight children **only where occupancy varies** within it — a large volume of empty air or a single solid wall remains as one coarse cell, while a tree's foliage subdivides down to the leaf resolution. The result is a multi-resolution map whose memory cost scales with the *complexity* of the scene rather than its bounded volume. For an ODD that includes long, mostly empty highway stretches, this is the difference between a few hundred MB and a few GB.
+
+OctoMap exposes the same operating knobs as a 2-D grid (`l_occ`, `l_free`, `l_min`, `l_max`, leaf resolution, occupancy threshold) plus the octree-specific ones (maximum depth, pruning policy). Free-space carving uses a 3-D ray-casting traversal that descends the tree and updates leaves along the ray. The reference C++ implementation `octomap::OcTree` is what most ROS2 stacks integrate.
+
+> [!info] OctoMap vs flat voxel grid
+> A flat 3-D voxel grid wastes memory on empty air and on the interior of solid objects; an octree wastes neither. The cost is that neighbor lookup and ray traversal are `O(log N)` rather than `O(1)`. For automotive perception at 10 Hz, the multi-resolution memory benefit usually outweighs the per-access overhead, and the C++ implementations are fast enough on a Jetson-class CPU to keep occupancy update inside the per-frame budget.
+
+## Generic Obstacle Detection — the class-agnostic safety fallback
+
+The per-class detector (whether classical clustering + L-shape fitting from [[5_3_clustering_EN|§5.3]] / [[5_4_object_shape_fitting_EN|§5.4]], or the DL detector of [[6_0_overview_EN|Ch 6]]) is good at recognizing the classes it was built for: vehicles, pedestrians, cyclists. It is, by construction, blind to anything else. A mattress in the lane, a deer, a fallen tree, a piece of construction debris, a tipped traffic cone — none of these belong to the trained vocabulary. **Generic Obstacle Detection** is the classical occupancy-based detector that catches these.
+
+The construction is simple. Take the occupancy grid (or the OctoMap volume), threshold cells at log-odds above `l_occ_thresh`, run connected components on the thresholded grid, filter components by minimum size and minimum height-above-ground, and emit each surviving component as a *generic obstacle* — a class-agnostic 3-D bounding volume with no class label, only an "occupied volume here, planner please avoid" semantic. The detector works because it asks a question the per-class detector does not: "is there any geometry in this cell that the ground plane does not explain?" The answer is independent of object identity.
+
+Generic Obstacle Detection is, in production stacks, the **safety fallback layer**: it runs in parallel with the primary per-class detector and the planner is required to respect the union of both. If the primary detector misses a fallen ladder because no training image contained one, the occupancy grid still reports a tall connected component above the road surface and the planner brakes or routes around it. This is the classical pattern that DL-primary stacks have not displaced: the learned detector is more accurate on its known classes, but it is not class-complete, and the safety case for everything outside its vocabulary still rests on geometric occupancy.
+
+## HD-map ROI gating — the Apollo HDMap pattern
+
+The other half of the section is the dual question: given that the per-class detector and the occupancy fallback both run, *where* should they look? The HD-map answers this. A road network's drivable polygons (lanes, junctions, shoulders, parking) and non-drivable polygons (sidewalks, building footprints, off-road areas) are authored once at map-construction time and stored as polygons in the `map` frame.
+
+Apollo's classical perception pipeline used the HDMap to produce, at startup or at map-tile load time, a **precomputed BEV ROI lookup table**: the drivable polygons are rasterized into a binary BEV grid at the same cell resolution as the occupancy grid, and each cell carries a single bit `is_in_ROI`. Cell-wise gating is then a constant-time lookup — no polygon-in-point geometry test on the hot path, no per-frame rasterization. The lookup table is parameterized by the ego's current map tile and is swapped as the vehicle drives between tiles.
+
+The C++ pseudocode is small enough to write inline:
+
+```cpp
+// hd_map_roi_lookup.cpp (sketch)
+// Precomputed at tile load:
+//   roi_grid_(i, j) = 1 if cell center lies inside any drivable polygon, else 0.
+// On the hot path, called per cluster or per occupancy component:
+bool IsInROI(const Eigen::Vector3d& p_map) const {
+  const int i = static_cast<int>((p_map.x() - origin_x_) / cell_size_);
+  const int j = static_cast<int>((p_map.y() - origin_y_) / cell_size_);
+  if (i < 0 || j < 0 || i >= rows_ || j >= cols_) return false;
+  return roi_grid_(i, j) != 0;
+}
+```
+
+ROI gating is then policy: clusters whose centroid (or any cell) falls inside the ROI are passed downstream; the rest are *gated out* of the primary detection path. The cost is one BEV index lookup per cluster.
+
+The gating is a performance and a safety lever at once. On the performance side, it removes thousands of clusters from sidewalks, building shoulders, and irrelevant off-road areas every frame, which is the difference between a tractable tracker and one that drowns in static returns. On the safety side, it is *also* the failure mode: anything outside the rasterized polygon — a child standing one tile inside a parking lot, a debris pile on the shoulder — is, by gating policy, not seen. Section 5.10 carries the validation requirement that ROI gating must be paired with a class-agnostic occupancy fallback whose evaluation domain is wider than the rasterized ROI.
+
+## Autoware `compare_map_segmentation` — map subtraction
+
+Autoware's `compare_map_segmentation` is the second classical map-aided pattern. The node consumes a prior point-cloud map of the static environment (typically built once via offline SLAM and persisted as PCD tiles) and the live `PointCloud2`. It registers the live cloud to the prior map — directly using **Role 2 from [[5_6_registration_EN|§5.6]]**, *map subtraction for change detection* — and emits the residual: every live point that the prior map does not explain within a tolerance.
+
+What survives the subtraction is, by construction, **dynamic** — vehicles, pedestrians, cyclists, anything that has moved since the map was built. The classical detection-by-elimination chain is then `map subtraction → clustering → fitting → tracking`, with a far smaller input cloud at the clustering stage than the unfiltered version would receive.
+
+Two operating cadences matter. The registration step (the alignment that makes the subtraction meaningful) typically runs **sub-rate** — every Nth frame, with the most recent transform held in between — because GICP or NDT scan-to-map at 10 Hz can be expensive. The subtraction itself runs **every frame** as a cell-wise residual against the registered map. The cadence split is one of the runtime patterns §5.9 inherits.
+
+`compare_map_segmentation` is a different shape of map-aided gating from the Apollo HDMap pattern. The Apollo lookup gates **where to look** (drivable polygons); Autoware's subtraction gates **what is dynamic** (whatever the prior cloud does not explain). They are complementary and a stack may use both.
+
+## Why this classical substrate survives inside DL-primary stacks
+
+The book's honest assessment is that learned 3-D detectors outperform classical clustering on accuracy *for the classes they know*. They do not, however, displace the substrate this section describes. The occupancy grid (and OctoMap, and Generic Obstacle Detection on top of them) provides the **class-agnostic safety fallback** that no per-class detector can provide on its own. The HD-map ROI gating and `compare_map_segmentation` provide the **prior** that lets a heavy DL stack run on a smaller, relevant subset of the cloud — Apollo's classical ROI filter still sits in front of learned modules, and Autoware's map-subtraction stages still narrow the input to dynamic content. In a deployed stack, the DL primary detector sits **on top** of this substrate, not under it: occupancy and ROI gating are early in the data flow, and they are required by the safety case rather than competing with it. The unification of the two halves of this section is what makes the safety case readable: the gating prior tells you where to spend compute, and the occupancy fallback tells you what to fall back to when the per-class detector is wrong about what it sees.
+
+## Failure modes (catalog entries)
+
+The interesting failures here are the ones that span both halves of the section.
+
+> [!warning] Failure modes for §5.10 catalog
+> | id | cause | observable_symptom | downstream_hazard | mitigation | validation_test |
+> |---|---|---|---|---|---|
+> | `5_7.fm.map_suppresses_real_actor` | A real actor (child, debris pile, cyclist cutting a corner) is geometrically present but lies outside the rasterized drivable polygon, so HD-map ROI gating filters its cluster before any detector sees it. | Per-class detector emits no detection; occupancy grid (if read) shows a clear connected component above ground in the gated-out region. | Planner does not know the actor exists and may not brake or yield; safety-critical miss with no in-pipeline diagnostic unless the fallback is wired correctly. | Run Generic Obstacle Detection on the *ungated* occupancy grid in parallel with ROI-gated per-class detection; require the planner to consume the union; widen the ROI by a buffer (e.g., 2 m) around drivable polygons. | Replay scenarios with actors crossing the ROI boundary (children near parking lots, debris on shoulders); assert that Generic Obstacle Detection emits a detection even when the per-class path is gated. |
+> | `5_7.fm.stale_map_after_construction` | HD map is older than the road state — junction repainted, lane added, construction barrier installed; the rasterized ROI no longer matches reality. | ROI polygons gate out a now-drivable cell or include a now-blocked cell; `compare_map_segmentation` flags large swaths of recently-changed static structure as "dynamic". | Phantom dynamic obstacles flood the tracker; or the gated ROI excludes a real lane and the per-class detector ignores actors there. | Track HD-map version in `header.frame_id` metadata and refuse activation past a freshness budget; run a change-detection diff between the prior map and a recent average occupancy grid; surface the diff on a diagnostic topic per [[2_7_hd_map_management_EN|Ch 2 §2.7]]. | Inject a synthetically aged HD map (e.g., a tile from before a known repaint) into a replay log; assert the freshness monitor trips and the system either degrades gracefully to map-free Generic Obstacle Detection or refuses activation. |
+> | `5_7.fm.localization_drift_offsets_roi` | Map-relative localization (Role 4 from §5.6) drifts by more than one BEV cell relative to the live cloud; the precomputed ROI lookup is now indexing the wrong row of the grid. | Clusters near ROI edges flicker in and out of the gated set frame-to-frame; occupancy log-odds for static walls smear across two cell columns; map-subtraction residual shows a static-structure ghost shifted by the drift offset. | Intermittent obstacles appear and disappear; tracker lifetimes thrash; planner sees a non-stationary world where reality is stationary. | Monitor registration residual on the Role-4 alignment and refuse ROI gating when residual exceeds half a cell; widen the ROI by one cell to absorb sub-cell drift; degrade to occupancy-only fallback above a drift threshold. | In §11.3 scenario testing, inject controlled localization drift (5 cm to 50 cm) and require that the ROI freshness monitor trips at the documented threshold and that no obstacle flickers in/out for more than two consecutive frames. |
+> | `5_7.fm.ray_casting_through_glass` | Glass walls, bus shelters, or wet road reflections produce specular returns that the LiDAR registers as hits on the *far* side of the surface; the ray-casting carving step then clears all cells along the spurious ray, including cells that genuinely contain the glass and any object behind it. | Occupancy grid shows a clear corridor through what is visibly a glass-walled bus shelter; a pedestrian behind the glass becomes "free" because the carving overwrote their cells. | Generic Obstacle Detection misses the pedestrian; planner treats the corridor as drivable. | Use the §5.1 return-selection policy to prefer first returns for ray casting; flag returns whose intensity-vs-range profile is consistent with specular reflection; cap `l_free` magnitude per ray so a single ray cannot fully clear a previously-occupied cell. | Replay glass-wall and wet-road sequences; assert that occupancy log-odds at the glass surface remain above the free threshold even after extended carving exposure. |
+
+The IDs follow the chapter convention `5_7.fm.<short_slug>` defined in the [[5_10_safety_and_validation_EN|§5.10]] catalog contract.
+
+## Runtime-budget row
+
+Per the [[5_9_deployment_runtime_EN|§5.9]] contract, the section commits one row to the chapter-wide runtime table. Values below assume a Velodyne VLP-32C / HDL-32E-class spinning LiDAR at 10 Hz on a Jetson-class edge module, with the HD-map ROI lookup table memory-resident and a 2-D BEV occupancy grid at `r = 0.2 m` over a `100 m × 100 m` window (250 000 cells).
+
+| stage | compute | frame_rate_assumption | point_count_assumption | latency_p50_ms | latency_p99_ms | memory_mb | cadence | tf_freshness_assumption | assumptions_and_caveats |
+|---|---|---|---|---|---|---|---|---|---|
+| `5_7_occupancy_freespace_map_roi` | cpu (gpu-optional) | 10 Hz spinning | ~60k pts/frame after §5.1 voxel downsample (VLP-32C single-return) | 8 | 25 | 220 | every-frame for occupancy update + ROI gating; map-subtraction registration sub-rate (every 3rd frame, per Role 2) | ≤ 50 ms | **Illustrative** budget for a single-roof-LiDAR C++ ROS2 node: 2-D BEV occupancy update with ray casting, OctoMap optional 3-D layer, Apollo-style HDMap ROI lookup, `compare_map_segmentation`-style map subtraction gated on the §5.6 Role-2 registration cadence. ROI gating itself is sub-millisecond because the LUT is precomputed; the dominant cost is ray casting. GPU acceleration of ray casting and occupancy update is available in some stacks (CUDA Bresenham kernels) and can roughly halve the CPU cost when present; assumed *off* in the numbers above. Memory dominated by the BEV grid plus one tile of the HD-map ROI LUT plus a short ring buffer of recent occupancy snapshots; OctoMap layer adds ~50–200 MB depending on scene complexity. Numbers exclude downstream clustering and tracking and should be measured per deployment.
