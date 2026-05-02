@@ -114,7 +114,7 @@ See the `obsidian:obsidian-markdown` skill for syntax reference.
 | **2** | Localization, mapping & ego-state estimation *(substrate — added per round-6 codex critique)* | 11 |
 | **3** | Object detection fundamentals + YOLO conceptual lineage *(theory only)* | 6 |
 | **4** | Comprehensive camera perception systems for AD *(applied; YOLO/DETR/RT-DETR/DEIM/anchor-free/open-vocab/MOT/dense perception/monocular & multi-cam 3D/foundation features/specialized AD targets incl. mingtai walkthrough/deployment/safety)* | 13 |
-| **5** | Classical LiDAR detection (with deployment + runtime constraints) | 10 |
+| **5** | Classical LiDAR detection (with object-shape fitting, occupancy + map-aided ROI gating, deployment + runtime constraints) | 11 |
 | **6** | Deep-learning LiDAR detection | 9 |
 | **7** | Camera + LiDAR sensor fusion (perception "Goal 1") | 9 |
 | **8** | Classical motion planning, prediction & control (with deployment + control-loop timing) | 10 |
@@ -135,7 +135,7 @@ Full section list lives in [[00_table_of_contents]]. Per-chapter overview pages 
 
 - **Classical LiDAR detection** = Ch 5 (preprocess / RANSAC / clustering / Kalman-IMM-JPDA tracking / ICP-NDT-GICP / occupancy grids).
 - **Classical motion planning, prediction & control** = Ch 8 (behavior + state machines / CV-CTRV-IMM-social-force prediction / A*-RRT-lattice planners / PID-pursuit-Stanley-LQR-MPC controllers).
-- **ROS2 / Humble middleware** = Ch 1 §1.5 + Ch 5 §5.7 + threaded through every node-integrating chapter.
+- **ROS2 / Humble middleware** = Ch 1 §1.5 + Ch 5 §5.8 + threaded through every node-integrating chapter.
 
 ---
 

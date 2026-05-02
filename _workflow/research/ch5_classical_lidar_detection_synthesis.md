@@ -334,17 +334,19 @@ Memory and `CLAUDE.md` do not need touch-ups for a section-count change or a sec
 
 ---
 
-## 4. Open questions (for user decision)
+## 4. Decisions recorded (Phase 2 round 4 AGREED)
 
-The Phase 2 deal-loop resolved every adjudicable item that did not require user authority. The questions below are the ones only the user can decide.
+Round 4 collapsed the prior "open questions for user" into codex-AGREED decisions, per the tightened workflow rule (`feedback_user_role_in_phases.md`: codex AGREED is the decision; no human review required). All six items below are settled and feed into the Phase 3 chapter plan.
 
-1. **Approve the structural-change bundle in §3?**
-   - Decision 1 — insert §5.4 "Object-shape fitting" (10 → 11 sections).
-   - Decision 2 — rename the (renumbered) §5.7 to "Occupancy, free-space & map-aided ROI gating."
-   - Approval of the bundle triggers the four-artifact lockstep update specified in §3.
-2. **Bilingual workflow at section level** — current vault has paired `_EN.md` / `_ZH.md`. The writer subagents will draft EN only (per the spec's open question 12.3). Confirm that ZH drafting remains a separate post-completion phase outside the writer pipeline for Ch 5 specifically.
-3. **Code-language hygiene for §§5.1–5.8 (renumbered)** — book deployment policy says C++ for classical perception (PCL / Eigen / OpenCV). Pedagogical examples may benefit from short Python / `numpy` sketches for clarity (e.g., RANSAC plane fit in 10 lines). Confirm: C++ is mandatory for any code that would actually ship; Python sketches are allowed inline for explanation. (Phase-3 plan input, surfaced now.)
-4. **Industry-context callout in §5.9 deployment (renumbered)** — recommended density: one paragraph total covering China-vs-US LiDAR deployment priors. Confirm or push back. (Editorial, not structural.)
+1. **§5.4 insertion (Object-shape fitting)** — **APPLIED** via the lockstep commit. Shape fitting is the missing conversion step between clusters and planner-consumable boxes; first-class section status is justified.
+2. **§5.7 rename (Occupancy, free-space & map-aided ROI gating)** — **APPLIED** via the lockstep commit. Map-aided ROI shares the BEV / free-space substrate; broadening the occupancy section is the cleanest placement.
+3. **Bilingual workflow for Ch 5** — **EN-only drafting; ZH is a separate post-completion phase** (no Ch-5 exception to the spec's open-question 12.3). Avoids doubling writer-agent scope during technical drafting.
+4. **Code-language rule for §§5.1–5.8 (renumbered)** — **C++ is authoritative for any shippable ROS2 / PCL / Eigen / OpenCV perception implementation. Python / `numpy` is allowed only as compact explanatory pseudocode** (≤ ~10 lines, before the production C++ version). No long Python implementations.
+5. **Industry-context callout in §5.9 (renumbered)** — **one paragraph total** covering China-vs-US LiDAR deployment priors. Not a recurring theme.
+6. **FMCW** — **one-paragraph mention in the §5.1 sensor primer only.** Not a structural topic of Ch 5.
+7. **Patchwork / Patchwork++** — **fully classical** (already corrected in §1.3); no further scope debate, no caveat in chapter prose.
+
+These decisions are inputs to the Phase 3 chapter plan + allocation deal-loop.
 
 ---
 

@@ -86,12 +86,13 @@ tags:
 - [ ] 5.1 Point-cloud preprocessing · [[5_1_pointcloud_preprocessing_EN|EN]] ○ · [[5_1_pointcloud_preprocessing_ZH|ZH]] ○
 - [ ] 5.2 Ground segmentation (RANSAC etc.) · [[5_2_ground_segmentation_EN|EN]] ○ · [[5_2_ground_segmentation_ZH|ZH]] ○
 - [ ] 5.3 Clustering — Euclidean, DBSCAN · [[5_3_clustering_EN|EN]] ○ · [[5_3_clustering_ZH|ZH]] ○
-- [ ] 5.4 Multi-object tracking — Kalman / IMM / JPDA · [[5_4_classical_tracking_EN|EN]] ○ · [[5_4_classical_tracking_ZH|ZH]] ○
-- [ ] 5.5 Registration — ICP / NDT / GICP · [[5_5_registration_EN|EN]] ○ · [[5_5_registration_ZH|ZH]] ○
-- [ ] 5.6 Occupancy grids & free-space · [[5_6_occupancy_grids_EN|EN]] ○ · [[5_6_occupancy_grids_ZH|ZH]] ○
-- [ ] 5.7 ROS2 integration · [[5_7_ros2_integration_EN|EN]] ○ · [[5_7_ros2_integration_ZH|ZH]] ○
-- [ ] 5.8 Deployment & runtime constraints · [[5_8_deployment_runtime_EN|EN]] ○ · [[5_8_deployment_runtime_ZH|ZH]] ○
-- [ ] 5.9 Safety & validation (template instance) · [[5_9_safety_and_validation_EN|EN]] ○ · [[5_9_safety_and_validation_ZH|ZH]] ○
+- [ ] 5.4 Object-shape fitting — L-shape, OBB, class priors · [[5_4_object_shape_fitting_EN|EN]] ○ · [[5_4_object_shape_fitting_ZH|ZH]] ○
+- [ ] 5.5 Multi-object tracking — Kalman / IMM / JPDA · [[5_5_classical_tracking_EN|EN]] ○ · [[5_5_classical_tracking_ZH|ZH]] ○
+- [ ] 5.6 Registration — ICP / NDT / GICP · [[5_6_registration_EN|EN]] ○ · [[5_6_registration_ZH|ZH]] ○
+- [ ] 5.7 Occupancy, free-space & map-aided ROI gating · [[5_7_occupancy_freespace_map_roi_EN|EN]] ○ · [[5_7_occupancy_freespace_map_roi_ZH|ZH]] ○
+- [ ] 5.8 ROS2 integration · [[5_8_ros2_integration_EN|EN]] ○ · [[5_8_ros2_integration_ZH|ZH]] ○
+- [ ] 5.9 Deployment & runtime constraints · [[5_9_deployment_runtime_EN|EN]] ○ · [[5_9_deployment_runtime_ZH|ZH]] ○
+- [ ] 5.10 Safety & validation (template instance) · [[5_10_safety_and_validation_EN|EN]] ○ · [[5_10_safety_and_validation_ZH|ZH]] ○
 
 ## Chapter 6 — Deep-Learning LiDAR Detection
 

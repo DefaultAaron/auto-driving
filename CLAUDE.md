@@ -30,7 +30,7 @@ A **comprehensive pedagogical guide for mastering autonomous driving** — funda
 
 **Ordering rationale:** prerequisites first; localization as substrate before perception; theory before applied (Ch 3 vs 4); classical before DL (Ch 5→6, 8→9); fusion sits between perception and planning; data + safety precede E2E.
 
-**Three classical layers — do not conflate:** classical-LiDAR-detection (Ch 5), classical-planning + prediction + control (Ch 8), ROS2/Humble middleware (substrate, Ch 1 §1.5 + Ch 5 §5.7 + threaded everywhere a node lands).
+**Three classical layers — do not conflate:** classical-LiDAR-detection (Ch 5), classical-planning + prediction + control (Ch 8), ROS2/Humble middleware (substrate, Ch 1 §1.5 + Ch 5 §5.8 + threaded everywhere a node lands).
 
 **Pinned deployment target:** PyTorch training → ONNX/TensorRT inference → C++ ROS2 nodes → edge GPU on vehicle → rosbag logging/replay.
 
