@@ -3,7 +3,7 @@ title: Next-session cue — Ch 5 Phase-4 Batch 3 dispatch checkpoint
 doc_type: workflow-cue
 status: pending
 created: 2026-05-02
-for_commit: 8dd9cc2
+for_commit: 69e2d6e
 tags: [workflow, pilot, ch5, batch-3, checkpoint]
 ---
 
@@ -12,7 +12,10 @@ tags: [workflow, pilot, ch5, batch-3, checkpoint]
 > [!warning] Freshness check before pasting
 > This cue updates only at coarse checkpoints (phase / batch / session boundaries). The live workflow status lives in [[STATE|`_workflow/STATE.md`]] and updates at every WIP / AGREED commit. **Before pasting:** compare this cue's `for_commit` (`8dd9cc2`) against `git rev-parse HEAD`. If HEAD is `for_commit` exactly, or 1–2 commits ahead with only `wip(...)` between them, the cue is current. If HEAD is more commits ahead OR includes any `agreed(...)` / `plan(...)` / `chapter(...)` / `lockstep(...)` since `for_commit`, treat this cue as **stale** and use STATE.md `next_action` instead.
 
-When the user starts a fresh Claude Code session after the Ch 5 Batch-2 close (commits up through `8dd9cc2 agreed(5/5_7_occupancy_freespace_map_roi)`), this is the first prompt to run. Paste it verbatim.
+When the user starts a fresh Claude Code session after the Ch 5 Batch-2 close (commits up through `8dd9cc2 agreed(5/5_7_occupancy_freespace_map_roi)`) plus the Phase-5 discipline lockstep at `69e2d6e`, this is the first prompt to run. Paste it verbatim.
+
+> [!important] Workflow discipline change since Batch 2
+> A `lockstep(workflow): Phase-5 revision discipline + bidirectional convergence + Rule 3c/3d updates` commit landed at `69e2d6e` after Batch 2 closed. **Batch 3 forward runs under the new rules**: Phase-5 revisions default to re-dispatching the original writer (cc-writer or codex-writer) wrapped in a one-section revision sentinel, not main inline edits; main-direct edits require `main-direct: minor / adjudication / writer-overhead` commit tags; convergence is bidirectional (main may `CONTESTED: <critique> — <category>: <one-line>` push back); Rule 3b/3c/3d updated. See `_workflow/subagents_design.md` Phase 5 + §8.1 + §5 Rules 3a–3d, `CLAUDE.md` "Subagents and the per-chapter pipeline" section, and the new memory file `feedback_phase5_revisions.md` for the full rule set. The §5.9 deal-loop will look different from the §§5.2–5.7 deal-loops as a result.
 
 ## Paste this
 
@@ -33,7 +36,7 @@ Before dispatching:
 
 6. After §5.9 returns: copy back if codex-writer (n/a — cc-writer here writes directly to main), run §6.4 post-batch validation, remove sentinel, single `wip(5/5_9_deployment_runtime)` commit.
 
-7. Then run Phase-5 per-section deal-loop on §5.9 alone (cc-drafted, codex CONFLICT only — no Rule 3b/3c).
+7. Then run Phase-5 per-section deal-loop on §5.9 alone (cc-drafted, codex CONFLICT only — no Rule 3b/3c since cc-drafted). **Under the new Phase-5 discipline:** every revision round defaults to re-dispatching cc-writer with the codex critique as the brief, wrapped in a one-section revision sentinel; main-direct edits require `main-direct: minor / adjudication / writer-overhead` commit tags. If a codex critique is wrong / off-target / out of scope, push back with `CONTESTED: <critique-id> — <rationale-category>: <one-line>` rather than just complying.
 
 8. After §5.9 reaches Phase-5 AGREED, the next natural step is Phase-4 Batch 4 (§5.10 safety & validation — depends on §§5.1–5.9 failure-mode catalog entries). Pause and tell me again before Batch 4 — same pattern as this checkpoint.
 
