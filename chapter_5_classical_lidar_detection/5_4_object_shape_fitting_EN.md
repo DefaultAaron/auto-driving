@@ -1,0 +1,161 @@
+---
+chapter: 5
+section: 4
+title: Object-shape fitting — L-shape, OBB, class priors
+language: EN
+workflow_status: reviewing
+tags:
+  - book/section
+  - book/chapter-5
+  - lang/EN
+---
+
+# 5.4 Object-shape fitting — L-shape, OBB, class priors
+
+> [!abstract] What this section covers
+> The geometric layer that turns a cluster into a planner-consumable 3D box. L-shape fitting (Zhang 2017) for vehicles, PCA / OBB for cheap fallbacks, min-area rectangle as the convex-hull optimum, and convex hull itself for non-rectangular actors. Class-prior dimensions for partial views. The section's pedagogical center is the failure-mode catalog: classical fits routinely produce *planner-hostile boxes* even when the underlying cluster looks fine.
+
+## Why this section exists
+
+A cluster is not yet an object. [[5_3_clustering_EN|§5.3]] hands you a list of point indices plus a coarse cluster-bbox approximation; the planner does not consume that. The planner — and [[5_5_classical_tracking_EN|§5.5]] tracking, and Ch 7 fusion — consume `(x, y, z, l, w, h, yaw, optional class)`. Object-shape fitting is the geometric step that produces that tuple. It is also where most classical-pipeline failures become visible to the rest of the stack: a cluster that contains the right points can still be fit to a box that points the wrong way, swells past the actor's true extent, or flips yaw between consecutive frames.
+
+That last point is the section's load-bearing argument. **Cluster quality and box quality are not the same metric.** A pipeline tuned only on cluster recall and IoU-of-points will publish boxes that look correct on a logged frame and break planning a hundred milliseconds later when the yaw inverts. Treat shape fitting as a first-class layer with its own failure modes, not as a one-line `getOrientedBoundingBox()` call after clustering.
+
+> [!info] Honest scoping
+> Classical shape fitting has been largely displaced in production primary-detection paths by learned 3D box regressors (PointPillars, SECOND, CenterPoint — see [[6_3_pointpillars_EN|Ch 6 §6.3]] and the rest of Ch 6). Where classical fits survive in modern stacks is in three roles: (1) a generic-obstacle fallback for unknown classes the learned detector was not trained on, (2) a safety-redundant secondary path that is geometrically interpretable, and (3) the box layer behind classical map-subtraction or occupancy-derived clusters. This section teaches the geometry; the role choice is a §5.9 / §5.10 question.
+
+## Prerequisites, restated inline
+
+Shape fitting consumes a cluster of non-ground points in `base_link` (the §5.1 output frame), each cluster representing a candidate object after [[5_2_ground_segmentation_EN|§5.2]] and [[5_3_clustering_EN|§5.3]]. We assume points are gravity-aligned — a fair assumption once `base_link` extrinsics and roll/pitch are correct ([[1_1_coordinate_frames_EN|Ch 1 §1.1]], [[1_3_lidar_calibration_EN|Ch 1 §1.3]]). Yaw in this section means rotation about the `base_link` z-axis; the BEV plane is the (x, y) plane. We treat `l` as the length along the box's local x-axis (the heading direction) and `w` as the width along its local y-axis, with `h` along z.
+
+The geometric primitives we lean on are: 2D convex hull of the BEV-projected cluster (Graham scan or monotone-chain, `O(N log N)`), eigendecomposition of a 2×2 covariance, and the rotating-calipers traversal of a convex polygon.
+
+## L-shape fitting (Zhang 2017) — the workhorse for vehicles
+
+A LiDAR sweep almost never sees a full vehicle. From any pose other than directly behind or directly in front, the cloud captures *two adjacent faces* of the box — typically the rear and one side, or the front and one side — meeting at a near-90° corner. Projected to BEV, the cluster outlines an "L" rather than a closed rectangle. Naive PCA on this L will mis-estimate yaw because the dominant eigenvector splits the difference between the two arms.
+
+Zhang, Wang, Wei & Wang (IV 2017) proposed a **search-based fit**: rotate a candidate yaw `θ` from 0 to π/2 (90° covers all rectangle orientations by symmetry), project the cluster onto the rotated axes, and score how well the projected points form an L. The yaw with the best score wins; the box dimensions fall out of the projection extents.
+
+The objective is a function over `θ ∈ [0, π/2)`. For each `θ`, rotate every BEV point `p_i = (x_i, y_i)` by `−θ`, compute `c1_i = x_i cos θ + y_i sin θ` and `c2_i = −x_i sin θ + y_i cos θ`, and look at the four box edges defined by `min(c1)`, `max(c1)`, `min(c2)`, `max(c2)`. Each cluster point is closest to one of those four edges. Zhang's paper gives three candidate scoring criteria:
+
+```text
+1. Area:        minimize the rectangle area (l · w) — favors the tightest enclosing rectangle.
+2. Closeness:   for each point, take its distance to the nearest of the four edges,
+                and minimize Σ d_i (or maximize Σ 1/(d_i + ε)) — favors points lying
+                on the rectangle's perimeter.
+3. Variance:    bin points by which edge they belong to, and minimize the variance
+                of distance-to-edge within each bin — favors crisp, well-separated edges.
+```
+
+The closeness criterion is the most common production choice for vehicles because it directly rewards the "L lies on the box's two visible faces" intuition. Search resolution is typically 1° or 0.5°; a coarse-to-fine pass (5° → 0.5°) is cheap. The full sweep is `O(N · K)` for `N` points and `K` yaw candidates, and runs in well under a millisecond per cluster on a modern CPU at automotive cluster sizes.
+
+Once `θ*` is chosen, the box dimensions and centroid follow directly:
+
+```text
+l = max(c1) − min(c1)
+w = max(c2) − min(c2)
+center_xy = R(θ*) · (½(min(c1)+max(c1)), ½(min(c2)+max(c2)))
+```
+
+with `z` and `h` taken from the cluster's vertical extent. The optional class is left as `unknown` unless an upstream cue assigns it.
+
+> [!tip] RANSAC L-fit, in one paragraph
+> A second classical option fits two perpendicular lines via RANSAC: sample a pair of points, hypothesize a line, count inliers, then fit a perpendicular partner from the remaining points. This is cheaper than Zhang's full search when the cluster has clear corner geometry, and it degrades more gracefully on clusters that are barely L-shaped (a vehicle seen nearly head-on contributes mostly one face). Production code that ships Zhang as the default usually keeps a RANSAC L-fit available as a same-interface alternative for ablation and for narrow-aspect clusters.
+
+## PCA / OBB — the cheap fallback
+
+Principal Component Analysis on the 2D BEV cluster gives an oriented bounding box almost for free. Compute the cluster's BEV centroid, form the 2×2 covariance matrix `C` of demeaned points, take its eigendecomposition, align the box axes with the eigenvectors, and read `l` and `w` from the projected extents along those axes.
+
+```text
+μ      = mean(p_i)
+C      = (1/N) Σ (p_i − μ)(p_i − μ)ᵀ
+{λ₁ ≥ λ₂}, {v₁, v₂} = eig(C)
+yaw    = atan2(v₁.y, v₁.x)
+```
+
+PCA is fast (`O(N)` plus a 2×2 eig), differentiable if you ever need it, and works adequately for elongated, well-sampled clusters. It is the right answer for a lone vehicle seen broadside at close range with a clean ring pattern.
+
+It is also where the **yaw-instability failure mode lives**. PCA picks the eigenvector of *largest variance*, which assumes the longer side of the actor produced more points. For an L-shaped cluster, the longer arm is not necessarily aligned with the actor's heading — and for symmetric or near-cylindrical clusters (the rear of a sedan seen head-on, a person, a barrel), `λ₁ ≈ λ₂` and the yaw the eigendecomposition returns is essentially noise. Across two consecutive frames, that noise can flip the chosen axis by 90°. The downstream tracker then sees a "rotation" that did not happen, and prediction goes sideways.
+
+PCA / OBB is therefore best framed as the cheap fallback for clusters whose shape is too sparse or too irregular for L-shape fitting to lock onto a corner. Use it consciously, not by default.
+
+## Min-area rectangle — the convex-hull optimum
+
+The min-area enclosing rectangle of a 2D point set is, by a classical result (Toussaint 1983), one of the rectangles whose sides are *flush with an edge of the convex hull*. This reduces the search to `O(H)` where `H` is the number of hull edges, and the rotating-calipers traversal computes it in linear time after the hull is built.
+
+```text
+hull  = convex_hull(BEV_points)        # O(N log N)
+for each edge e of hull:                # O(H)
+    θ = orientation(e)
+    project hull onto (θ, θ + π/2) axes
+    track the rectangle with smallest area
+```
+
+Min-area rectangle is the geometric optimum for "smallest enclosing rectangle." It is **not** the right answer for a partial vehicle cluster, and that distinction is the pedagogical point. L-shape fitting prefers the rectangle whose sides *lie under the visible points*; min-area rectangle prefers the rectangle whose sides *enclose every point with the least area*. For an L-shaped cluster these two objectives disagree: min-area will rotate the rectangle to bound the L tightly, often picking a yaw 45° off from the true heading. For a closed cluster (a fully observed object, or a convex actor like a pedestrian) the two agree.
+
+The practical role of min-area rectangle in a Ch 5 pipeline is therefore: a strong default for clusters known to be approximately convex (pedestrians, small obstacles, accumulated debris) and a sanity check against L-shape fitting on vehicles (large disagreement is a flag).
+
+## Convex hull — when the planner wants the actual shape
+
+Sometimes the right answer is not a rectangle. Pedestrians, cyclists with extended limbs, a person pushing a stroller, a tow strap connecting two vehicles, a flatbed carrying irregular cargo — all of these are poorly approximated by an OBB. Some planners can consume polygonal footprints directly; some consume the convex hull as a conservative bound that is tighter than a rectangle.
+
+The convex hull of the BEV-projected cluster is `O(N log N)` and produces an ordered list of hull vertices that downstream code can rasterize, simplify, or inflate. The book-canonical box tuple `(x, y, z, l, w, h, yaw, optional class)` is still the primary perception interface — convex hull travels alongside it as an *optional* footprint payload, not as a replacement.
+
+> [!example] When to keep the hull
+> A pedestrian cluster fits a 0.6 × 0.6 m OBB cleanly, but the same cluster's convex hull retains the asymmetry of an outstretched arm or a bag at the side. If the §5.5 tracker uses the OBB and the planner uses the hull, both views stay consistent because they come from the same cluster with the same yaw — the hull is just additional fidelity that the planner can consume when it cares.
+
+## Class-prior box dimensions — back-filling the hidden faces
+
+A LiDAR cluster of a vehicle 40 m away might contain 30 points covering one corner. The visible extent along the two axes is, say, 1.6 m × 0.8 m. The actor is almost certainly a 4.5 m × 1.8 m sedan. If the box is published at the *visible* extent, the tracker will see it grow as the vehicle approaches, and the planner will under-reserve clearance.
+
+Class-prior dimensions are the classical fix. Given a candidate class (sedan, truck, pedestrian, cyclist), substitute the prior `l × w × h` for any axis where the cluster's observed extent is less than a threshold (say 60% of the prior). The yaw stays from the L-shape fit; the centroid is shifted along the heading axis so that the *visible* face (the rear or front of the vehicle, whichever the L-shape corner identifies) stays anchored to the cluster.
+
+Two pieces entangle here:
+
+1. **Class assignment.** Classical pipelines often do not have a class. The clusterer produces "candidate object," not "candidate sedan." Without a class, the prior table cannot be indexed. Production classical fallbacks usually pick a class by gross dimensions (anything in `[3, 6] m × [1.5, 2.2] m × [1.2, 2.0] m` is "vehicle-like") and otherwise publish `unknown` with the visible-extent box.
+2. **Which face is anchored.** L-shape fitting tells you the corner. The corner tells you which two faces are visible — but not whether the *front* or the *rear* is one of them. Without a velocity prior or a tracker, classical fitting cannot disambiguate "vehicle facing toward us" from "vehicle facing away." The tracker fixes this in [[5_5_classical_tracking_EN|§5.5]] by accumulating a heading consistent with the velocity vector.
+
+The honest framing: class-prior back-fill is a hack that pays for the fact that classical fitting can only see what the LiDAR saw. It works because vehicles really do have a tightly clustered dimension prior. It breaks on classes the prior table does not anticipate (a forklift, a motorized wheelchair, a truck with a non-standard trailer), which is one of the reasons learned detectors won this fight in production.
+
+## Output contract — what §5.5 reads from this section
+
+Per-frame, §5.4 publishes a list of fitted boxes. Each entry is:
+
+```text
+(x, y, z, l, w, h, yaw, optional class)
+```
+
+with semantics:
+
+- **Frame.** `base_link` at sweep-end time, matching [[5_1_pointcloud_preprocessing_EN|§5.1]]'s output frame and timestamp.
+- **(x, y, z).** Box centroid. `z` is the vertical center, not the ground contact.
+- **(l, w, h).** Length along the box's local x-axis (heading), width along local y, height along z. Either the visible extent or the class-prior-back-filled extent, with a flag indicating which.
+- **yaw.** Rotation about z, in radians, in `[−π, π)`. **BEV plane only**: pitch and roll are not modeled by classical shape fitting in this chapter.
+- **optional class.** `unknown` is a valid value. When set, it is consistent with the prior used for back-fill.
+
+[[5_5_classical_tracking_EN|§5.5]] consumes these per-frame boxes and runs Kalman / CTRV / IMM filters with Hungarian / GNN / JPDA / MHT association, with AB3DMOT (Weng & Kitani 2020) as the canonical baseline. The detection input to §5.5 is per-frame fitted boxes, not raw clusters; track output flows downstream to Ch 7 fusion and Ch 8 prediction.
+
+A convex hull may travel alongside as an optional footprint payload (see above) but is not part of the binding tuple.
+
+## Failure-mode pedagogy
+
+This is where most of the section's value lives. Classical shape fitting can produce boxes that satisfy a per-frame IoU metric and still break the planner. The four canonical patterns:
+
+> [!warning] Failure modes for §5.10 catalog
+> | id | cause | observable_symptom | downstream_hazard | mitigation | validation_test |
+> |---|---|---|---|---|---|
+> | `5_4.fm.yaw_flip` | PCA on a near-square cluster (rear of a sedan seen head-on, a small symmetric obstacle), or L-shape search picking a degenerate corner when only one face is visible. `λ₁ ≈ λ₂` makes the chosen eigenvector unstable across frames; for L-shape, the closeness score is nearly flat across two yaw candidates 90° apart. | Box yaw inverts by 90° (or 180°) between consecutive frames despite the cluster moving smoothly. Tracker reports rotation rates of tens of rad/s; predicted trajectory swings sideways. | Planner receives an actor "rotating in place" and either over-brakes for a phantom yaw rate or refuses to commit to a lane-change because the predicted heading is incoherent. | Prefer L-shape over PCA when corner-strength score exceeds threshold; otherwise fall back to PCA with a yaw-stickiness penalty seeded from the previous frame's box; let §5.5 enforce yaw continuity through the tracker's heading state. | Replay logs of slow-moving and stationary vehicles seen at varying aspect angles; assert per-track yaw-rate p99 stays below a physical bound (e.g. 1.5 rad/s for cars). |
+> | `5_4.fm.partial_view_oversized_box` | A sparse far cluster of, say, 25 points covering one rear corner of a vehicle is fit at *visible* extent without class-prior back-fill, or the prior is back-filled along the wrong axis because the L-shape corner was misidentified. | Box dimensions shrink and grow as the vehicle approaches; or the box swells well beyond a sedan's prior because the class assignment picked "truck." | Tracker's process noise has to absorb spurious extent change as motion; planner under-reserves clearance for "small" far vehicles or over-reserves for inflated near ones. | Apply class-prior back-fill with conservative thresholds; flag the box with a `visible-extent-only` bit when point count is below a per-range floor; let the tracker accumulate extent over several frames before promoting to a confident class. | Ground-truth-overlay validation on far-range (>30 m) vehicle logs: assert per-track extent variance after the first N frames stays inside the prior's range. |
+> | `5_4.fm.l_pointing_wrong_way` | Only the rear face of a vehicle is visible (vehicle directly ahead, ego following). The L-shape search has no second arm to lock onto, and chooses a yaw that minimizes closeness over a single line — often parallel to the visible face, which is *perpendicular* to the actor's true heading. | Vehicle in front of ego is published with yaw rotated 90°: heading reported as crossing left-to-right when the actor is in fact moving forward in the same lane. Across frames the yaw stays wrong but stable, so the symptom is not yaw flip but sustained mis-heading. | Planner classifies a leading vehicle as a crossing actor; ACC misbehaves; lane-change decisions read a co-moving car as a side hazard. | Detect single-face-only clusters by counting hull edges and corner strength; for those, prefer class-prior heading from the velocity hint of the previous track, or hold yaw from §5.5 until a corner re-appears; suppress yaw confidence in the published tuple. | Replay car-following logs; assert that yaw error against ground truth is <10° for clusters with at least one corner visible, and that the yaw-confidence flag goes low when no corner is seen. |
+> | `5_4.fm.spray_inflated_box` | Tire spray, exhaust plume, or rain returns survive [[5_1_pointcloud_preprocessing_EN\|§5.1]]'s SOR/ROR and get attached to a vehicle's cluster by [[5_3_clustering_EN\|§5.3]]. The min-area rectangle or L-shape fit then encloses the actor *plus* the spray. | Box behind a truck on wet road extends 1–2 m past the actual rear bumper; the trailing edge oscillates with spray density. | Following distance estimation is confused; planner cannot resolve whether the trailing edge is rigid or stochastic, and the gap to the actor effectively shrinks. | Range-aware spray filters earlier in §5.1; cluster-side gating that strips low-density tail points before fitting; weight closeness scores toward dense corners and away from sparse trailing points; reject trailing extent contributions below a density threshold. | Wet-road and truck-following replay; compare published box length against reference (radar / ground truth) and assert that the rear-edge stability is within tolerance across a sliding window. |
+> | `5_4.fm.subcluster_halves_one_box` | [[5_3_clustering_EN\|§5.3]] split one vehicle into two sub-clusters along a low-return seam (a dark side panel, a window, an occluding pole), and §5.4 fits one box per sub-cluster instead of one box per vehicle. | Two adjacent boxes appear where one vehicle exists; their combined footprint matches the true vehicle but each individual box is half-sized and mis-yawed. | Tracker maintains two separate tracks for one actor; planner sees a non-existent gap between the halves, or worse, treats one half as a small overtakeable obstacle. | Post-fit cluster-merge step: adjacent boxes whose combined extent matches a class prior and whose yaws agree within tolerance are candidates to merge before publishing. Diagnostic: the §5.10 catalog should treat this as a §5.3 / §5.4 boundary case, not just a clustering bug. | Replay logs through known dark-vehicle and partial-occlusion scenarios; assert that one-box-per-actor recall on §5.5's tracks stays above threshold. |
+
+The IDs follow the chapter convention `5_4.fm.<short_slug>` consumed by the [[5_10_safety_and_validation_EN|§5.10]] catalog.
+
+## Runtime-budget row
+
+Per the [[5_9_deployment_runtime_EN|§5.9]] contract, §5.4 commits one row to the chapter-wide runtime table. The numbers below assume a §5.3 cluster set of roughly 50 candidate clusters per frame at 10 Hz, on the host CPU of a Jetson-class edge module. L-shape search is done at 1° resolution coarse-to-fine; PCA / min-area / convex hull are available on the same code path and selected per cluster.
+
+| stage | compute | frame_rate_assumption | point_count_assumption | latency_p50_ms | latency_p99_ms | memory_mb | cadence | tf_freshness_assumption | assumptions_and_caveats |
+|---|---|---|---|---|---|---|---|---|---|
+| `5_4_object_shape_fitting` | cpu | 10 Hz | ~50 clusters/frame from §5.3, median ~120 points/cluster after preprocessing | ~3 | ~9 | ~24 | every-frame | ≤ 50 ms | **Illustrative** budget for a C++ ROS2 node implementing L-shape (Zhang 1° search, coarse-to-fine), PCA / OBB, min-area rectangle (rotating calipers), convex hull, and class-prior back-fill on a single thread. Latency is dominated by L-shape search on the larger clusters; PCA-only or OBB-only paths run in ~1 ms. Memory is small because work is per-cluster. Per-deployment numbers vary with cluster count, point distribution, and search resolution and should be measured rather than assumed. Numbers exclude §5.5 tracker overhead.
