@@ -26,9 +26,11 @@ This section consumes those boxes, not raw clusters and not `PointCloud2`. The t
 (x, y, z, l, w, h, yaw, vel, optional class, track_id, age, status)
 ```
 
-with a covariance estimate. In this chapter the default output frame is `base_link` for near-field obstacle tracking. A stack may additionally publish an `odom` projection using ego-pose. The frame must be explicit; `base_link`, `odom`, and `map` are not interchangeable labels.
+with a covariance estimate.
 
-The prerequisites are small. A Kalman filter is a recursive estimator with a state, prediction model, measurement model, and covariance. Association assigns detections to existing tracks. The ego-state from Ch 2 provides ego-pose and ego-motion; if boxes are tracked in `odom`, ego-pose compensation is already baked into the state frame.
+**The tracking state is maintained in `odom`, not `base_link`.** A track's velocity is the actor's velocity in the world; `base_link` is the ego-vehicle's body frame, so a stationary actor in `base_link` carries the *negative* ego velocity, and a CV-KF in `base_link` would treat every parked car as moving backward at ego speed. Tracking in `odom` (the locally-consistent ego-pose frame from [[2_3_lidar_localization_EN|Ch 2 §2.3]]) makes ego-motion compensation implicit: detections from §5.4 arrive in `base_link` and the tracker transforms them into `odom` using the timestamped ego-pose at `header.stamp` before predict/update. Published tracks are emitted in `odom` with a frame-of-reference field; downstream consumers that need `base_link` (planner near-field, visualization) reproject from `odom` using the same ego-pose. `map` is used when global consistency over hours of operation is required (HD-map-relative consumers, longer-horizon prediction). The frame must be explicit on every message; `base_link`, `odom`, and `map` are not interchangeable labels, and a tracker that runs filter math in `base_link` without explicit ego-motion compensation is a known failure pattern, not a stylistic choice.
+
+The prerequisites are small. A Kalman filter is a recursive estimator with a state, prediction model, measurement model, and covariance. Association assigns detections to existing tracks. The ego-state from Ch 2 provides ego-pose and ego-motion ([[2_1_ego_state_estimation_EN|Ch 2 §2.1]] / [[2_2_gnss_ins_imu_fusion_EN|Ch 2 §2.2]]) — its freshness and accuracy bound the tracker's correctness because every measurement transform from `base_link` to `odom` consumes a timestamped ego-pose lookup.
 
 > [!info]
 > Classical LiDAR tracking is Tracking-by-detection. The tracker does not rediscover objects from points. It consumes fitted 3D boxes and repairs the temporal defects left by clustering and shape fitting: missed boxes, yaw flips, split boxes, merged boxes, and identity ambiguity.
@@ -81,7 +83,7 @@ P ← (I - K H) P
 `Q` says how much unmodeled acceleration is expected. `R` says how noisy the fitted box measurement is. Sparse far clusters should have larger `R`; fresh near-field boxes can be trusted more. A coasted track should grow `P` during prediction so association gates widen honestly.
 
 > [!tip]
-> Start with CV-KF in `base_link` or `odom`, Mahalanobis gating, and Hungarian association before adding model complexity. Most tracking bugs are frame, timestamp, association, or lifecycle bugs, not filter-equation bugs.
+> Start with CV-KF in `odom` (per the frame discussion above), Mahalanobis gating, and Hungarian association before adding model complexity. Most tracking bugs are frame, timestamp, association, or lifecycle bugs, not filter-equation bugs.
 
 ## CTRV and CTRA
 
@@ -149,6 +151,8 @@ AB3DMOT is also a useful teaching boundary. It assumes the detector already emit
 
 AB3DMOT remains a baseline because it exposes the minimum working skeleton: state, covariance, gating, Hungarian association, lifecycle, and metrics.
 
+Tracking is one of the load-bearing classical pieces that **survives inside DL-primary stacks**. The detection layer in production L4 robotaxi and most consumer NOA stacks is now learned (PointPillars / SECOND / CenterPoint and successors — see Ch 6), but the temporal layer over those detections is still very often a Kalman / Hungarian / lifecycle pipeline of the kind this section teaches, with learned ID-embeddings or appearance cues as optional add-ons. The reasons are practical: the math is interpretable, the failure modes are diagnosable, and the layer has to compose with downstream prediction (Ch 8) and fusion (Ch 7) which themselves have classical components. [[5_9_deployment_runtime_EN|§5.9]] picks up this argument with explicit ODD bounds.
+
 ## Track lifecycle
 
 A tracker needs a lifecycle because detections are noisy. A single fitted box should not instantly become a planning-grade object, and one missed frame should not instantly delete a real actor.
@@ -165,7 +169,7 @@ Lifecycle must connect directly to §5.4 failure modes. Yaw flips should not cre
 
 ## Camera tracker handoff
 
-[[4_6_camera_tracking_EN|Ch 4 §4.6]] covers ByteTrack, OC-SORT, and BoT-SORT on the camera side. The ideas migrate: prediction, association, lifecycle, confidence thresholds, and identity management are the same conceptual machinery. The measurement model is different. Camera trackers associate 2D image boxes and often lean on detector confidence and appearance cues. LiDAR trackers associate 3D boxes in `base_link` or `odom`, with metric distance, 3D/BEV IoU, yaw, dimensions, and covariance.
+[[4_6_camera_tracking_EN|Ch 4 §4.6]] covers ByteTrack, OC-SORT, and BoT-SORT on the camera side. The ideas migrate: prediction, association, lifecycle, confidence thresholds, and identity management are the same conceptual machinery. The measurement model is different. Camera trackers associate 2D image boxes and often lean on detector confidence and appearance cues. LiDAR trackers associate 3D boxes in `odom` (per the frame discussion at the section opening), with metric distance, 3D/BEV IoU, yaw, dimensions, and covariance.
 
 This distinction matters for [[7_0_overview_EN|Ch 7]] fusion. Fusion receives tracks that already have metric position and covariance, not image-plane rectangles. It also matters for [[8_0_overview_EN|Ch 8]] prediction: prediction should see stable identity and velocity, but it should not inherit unmarked coasted states as if they were fresh observations.
 
@@ -179,7 +183,13 @@ This distinction matters for [[7_0_overview_EN|Ch 7]] fusion. Fusion receives tr
 
 `vel` is normally `(vx, vy)` for BEV consumers or `(vx, vy, vz)` when vertical velocity is estimated. `status` is one of `birth`, `confirm`, `coast`, `delete`. `delete` can be emitted as a final tombstone for one frame, or represented by absence after the last coasted publish. The uncertainty estimate is typically the Kalman covariance over dynamic state.
 
-Frame policy for this chapter: publish primary tracks in `base_link` at the current perception timestamp, with metadata for a downstream node to transform them into `odom` using ego-pose. If the tracker itself operates in `odom`, the message must say so and diagnostics should monitor ego-pose freshness as [[5_1_pointcloud_preprocessing_EN|Ch 5 §5.1]] and [[5_8_ros2_integration_EN|Ch 5 §5.8]] do for `PointCloud2`. [[5_6_registration_EN|Ch 5 §5.6]] becomes relevant when ego-pose or map alignment is refined before projection into `odom` or `map`.
+Frame policy for this chapter: the tracker maintains and publishes primary tracks in `odom` (per the section opening). Diagnostics monitor ego-pose freshness — staleness in the `base_link → odom` transform shows up as a tracking failure, not a §5.1 or §5.8 failure, because every measurement transform consumes that lookup. Downstream `base_link` consumers (planner near-field, visualization) reproject from `odom`. [[5_6_registration_EN|Ch 5 §5.6]] is relevant when localization is degraded enough that the `odom → map` connection or even the `base_link → odom` consistency must be refreshed by registration.
+
+Per the [[5_4_object_shape_fitting_EN|§5.4]] output contract, fitted boxes carry side-channel diagnostic fields alongside the binding tuple: `extent_source ∈ {visible_only, class_prior_backfill}`, `yaw_confidence ∈ [0, 1]`, and `corner_visibility ∈ {two_corners, one_corner, no_corner}`. The tracker consumes these to gate behavior:
+
+- when `extent_source = visible_only` (sparse far cluster), the tracker accumulates extent over several confirmed frames before promoting class confidence;
+- when `yaw_confidence` is low or `corner_visibility = no_corner`, the tracker prefers its own velocity-derived heading prior over the per-frame `yaw` and gates yaw-rate updates more conservatively (this is what neutralizes `5_4.fm.l_pointing_wrong_way` at the tracking layer);
+- when these fields are absent (a different §5.4 implementation that does not emit them), the tracker treats them as `unknown / unset` and falls back to its default policy.
 
 > [!warning] Failure modes for §5.10 catalog
 > | id | cause | observable_symptom | downstream_hazard | mitigation | validation_test |
