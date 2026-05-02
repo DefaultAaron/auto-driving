@@ -156,11 +156,11 @@ The vault uses a five-actor team and a six-phase per-chapter pipeline. The verbo
 
 | Role | Runtime | Writes to vault? | Modes |
 |---|---|---|---|
-| Main session | Claude Code (this CLI) | yes — sole authority for `CLAUDE.md`, `README.md`, memory, TOC, chapter overviews, final commits | orchestrator |
-| `codex-collaborator` | codex-companion runtime, no `--write` | no | RESEARCH \| CONFLICT (sole conflictor) |
-| `gemini-researcher` | Gemini CLI, `--approval-mode plan` | no | RESEARCH only + factual spot-check |
-| `cc-writer` | Claude Code subagent | yes — only the batch-assigned section path, hook-enforced | WRITER only |
-| `codex-writer` | codex-companion runtime, `--write`, `--cwd` to sacrificial worktree | only the assigned section path is copied back to main repo | WRITER only |
+| Main session | Claude Code (this CLI) | yes — sole authority for `CLAUDE.md`, `README.md`, memory, TOC, chapter overviews, final commits | orchestrator + **conflictor for codex-drafted sections (Phase 5 Path B rounds 1..N-1)** |
+| `codex-collaborator` | codex-companion runtime, no `--write` | no | RESEARCH \| CONFLICT (cc-drafted every round / codex-drafted final-round sanity pass only) |
+| `gemini-researcher` | Gemini CLI, `--approval-mode plan` | no | RESEARCH only + content-risk-triggered factual spot-check |
+| `cc-writer` | Claude Code subagent | yes — only the batch-assigned section path, hook-enforced | WRITER only (drafts AND revisions) |
+| `codex-writer` | codex-companion runtime, `--write`, `--cwd` to sacrificial worktree | only the assigned section path is copied back to main repo | WRITER only (drafts AND revisions) |
 
 ### 9.2 The six phases (per chapter)
 
@@ -168,7 +168,11 @@ The vault uses a five-actor team and a six-phase per-chapter pipeline. The verbo
 2. **Research deal-loop** — main + `codex-collaborator` (`MODE: CONFLICT`, `RESUME: true` across rounds) iterate on what to keep/cut and on any structural proposals codex raises (new section, reorder, additions beyond the canonical 13-chapter plan). Structural changes are *proposed-not-adopted*: they require explicit user approval and a lockstep update across memory + CLAUDE.md + README + TOC + chapter overviews before drafting begins.
 3. **Chapter plan + allocation deal-loop** — main session drafts an 11-item plan: section list (scope-in/out, depth, length band) · section dependency DAG · parallel batch groups · writer assignments (cc/codex per section, with rationale) · handoff snippets · style anchor reference · prerequisite chain · canonical TOC slice · must-preserve terminology list · reader knowledge assumptions · downstream commitments. Codex CONFLICT reviews all 11 items.
 4. **Per-section drafting (parallel where independent)** — main session enforces a full-repo `git status --porcelain` clean precondition, writes the batch sentinel (`.claude/active_writer_batch.json`) listing assigned paths, dispatches all writers in the batch in a single message (parallel `Agent` tool calls), copies codex-writer outputs back from the worktree, runs structured post-batch validation, removes the sentinel.
-5. **Per-section deal-loop** — main + codex CONFLICT iterate on the draft (framing + terminology + surface voice + handoff fidelity + scope creep). For codex-drafted sections, main also dispatches `gemini-researcher` for a factual spot-check on 2–3 claims (Rule 3b) and runs the codex-bias checklist (Rule 3c).
+5. **Per-section deal-loop** — **asymmetric by writer model** (post-2026-05-02):
+   - **Path A — cc-drafted sections.** Main + codex-collaborator CONFLICT iterate every round under bidirectional convergence; both must AGREE; main may push back via `CONTESTED:`.
+   - **Path B — codex-drafted sections.** Main session conflicts rounds 1..N-1 unilaterally (with the four named bias axes — markdown over-listing, analogy register, foundational example choice, depth defaults — folded into main's prompt as Rule 3c absorption). Before declaring AGREED, main dispatches codex-collaborator for one final-round sanity pass at round N. Any fix to a codex-collaborator final-round critique requires another codex-collaborator pass on the changed text — convergence requires codex-collaborator AGREED on the actual final commit.
+   - For codex-drafted sections, main also dispatches `gemini-researcher` for a factual spot-check on 2–3 claims (Rule 3b — content-risk-triggered, rerun on factual changes only).
+   - **All section-content writing — drafts AND revisions — goes through writers.** The `main-direct: minor` and `main-direct: adjudication` audit tags are deprecated; only `main-direct: writer-overhead` survives with a narrow definition (spelling, duplicated word, broken Markdown, obvious syntax/format artifact — no semantic changes, no sentence rewrites).
 6. **Chapter voice pass (terminal)** — main + codex harmonize **surface concerns only**: cross-section transitions, pacing, redundancy, surface-voice smoothing, terminology drift catch. **No structural rewrites at Phase 6** — if a section needs structural rework, it goes back to Phase 5. On AGREED, main session sets every section's `workflow_status: complete` and commits the chapter with TOC + chapter-overview lockstep updates bundled in.
 
 ### 9.3 Section file lifecycle
@@ -184,12 +188,13 @@ The field is kept indefinitely (no stripping). If an export pipeline is added la
 
 ### 9.4 Allocation ratio and same-model bias mitigation
 
-**Default ratio**: 1:1 cc-writer : codex-writer. Main session adjusts dynamically per chapter using context-size pressure on the main session (proxy for Claude quota stress), recent codex usage, chapter character (theory-heavy → cc bias; applied/code-heavy → codex bias), and explicit user override. Codex CONFLICT can challenge the chosen ratio in Phase 3.
+**Default ratio**: codex-writer-default; cc-writer reserved for chapter-classified contested-framing / high-judgment-synthesis / novel-pedagogical-integration sections. Expected per-chapter ratio ~2cc : 8codex (rough). The codex-default tilt is a usage-budget choice — Claude budget is the binding constraint and main-session orchestration + Phase-5 Path B conflict review consumes it; codex-writer drafting consumes Codex budget instead. **Allocation is finalized at the Phase-3 deal-loop and locked for the chapter — no mid-run fallback** (codex-collaborator adjudicates classification in the Phase-3 deal-loop; the "codex round 1 failed" judgment would itself be high-judgment, not main's call alone).
 
-**Procedural bias mitigation:**
-- **Rule 3a — allocation skew.** When ratio is tied, cc-writer drafts novel/contested/theoretically-loaded sections; codex-writer drafts well-known applied sections.
-- **Rule 3b — gemini factual spot-check on codex-drafted sections.** Main selects 2–3 claims, dispatches gemini, only proceeds toward AGREED after verification.
-- **Rule 3c — codex-bias checklist.** Main runs codex-drafted sections against an explicit checklist before AGREED (markdown over-listing, analogy register, foundational example choice, depth defaults).
+**Bias mitigation — primarily structural via Phase 5 Path A/B asymmetry, plus residual procedural rules:**
+- **Rule 3a — codex-default allocation, cc reserved at Phase 3.** Writer ratio defaults to codex-writer; cc-writer is reserved for sections the chapter explicitly classifies at Phase 3 as contested-framing / high-judgment-synthesis / novel-pedagogical-integration. Allocation locked at Phase-3 AGREED (no mid-run fallback).
+- **Rule 3b — gemini factual spot-check on codex-drafted sections, content-risk-triggered.** Main selects 2–3 claims, dispatches gemini, proceeds toward final-round codex-collaborator AGREED only after verification. Rerun when round-1 commits substantive factual claims OR a subsequent revision adds/materially changes factual claims; do NOT auto-rerun per round.
+- **Rule 3c — codex-bias checklist axes folded into main's Path B conflict-review prompt.** As of post-2026-05-02, Rule 3c as a separate procedural step is deprecated; the four axes — **markdown over-listing**, **analogy register**, **foundational example choice**, **depth defaults** — are part of every Phase-5 Path B round's main-conflict review. Main's critique must enumerate which axes (if any) flagged.
+- **Rule 3d — round-4+ writer-side break.** When main has raised the same critique 3+ times on a codex-drafted section without convergence, main dispatches a cc-writer fresh-eye revision on the disputed passage (one-section sentinel). "Same critique" requires same passage (line-anchored) + same unresolved defect + same requested outcome across rounds; persistent critique IDs (e.g. `5.X-r2-c3` reused at rounds 2/3/4) are required so the trigger is not gameable by varying phrasing.
 
 ### 9.5 Path scoping and safety
 
@@ -248,7 +253,7 @@ Two paths: writer-pipeline drafting (the default for sections drafted via cc-wri
 **Writer pipeline (preferred):**
 
 1. Decide chapter `N` and section number `N_M`.
-2. Add the section to the Phase 3 chapter plan (scope, depth, length band, dependency edges, writer assignment per the 1:1 dynamic ratio, handoff snippet if dependent).
+2. Add the section to the Phase 3 chapter plan (scope, depth, length band, dependency edges, writer assignment per Rule 3a — codex-default unless the section is chapter-classified as contested-framing / high-judgment-synthesis / novel-pedagogical-integration — handoff snippet if dependent).
 3. After Phase 3 AGREED, the writer subagent creates the file at `chapter_N_*/N_M_<slug>_EN.md` with frontmatter `workflow_status: draft` plus the brief-required fields (`chapter`, `section`, `title`, `language`, `tags`). The writer never creates the `_ZH.md` — bilingual translation is a separate post-completion phase.
 4. Phase 5 deal-loop revisions flip the file to `workflow_status: reviewing`.
 5. Phase 6 voice pass AGREED → `workflow_status: complete`. Field is **kept** on the file indefinitely (no stripping).
