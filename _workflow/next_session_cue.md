@@ -3,16 +3,16 @@ title: Next-session cue — Ch 5 Phase-4 Batch 4 dispatch checkpoint
 doc_type: workflow-cue
 status: pending
 created: 2026-05-02
-for_commit: f7f5bd7
+for_commit: b1fc121
 tags: [workflow, pilot, ch5, batch-4, checkpoint]
 ---
 
 # Next-session cue — Ch 5 Phase-4 Batch 4 dispatch checkpoint
 
 > [!warning] Freshness check before pasting
-> This cue updates only at coarse checkpoints (phase / batch / session boundaries). The live workflow status lives in [[STATE|`_workflow/STATE.md`]] and updates at every WIP / AGREED commit. **Before pasting:** compare this cue's `for_commit` (`f7f5bd7`) against `git rev-parse HEAD`. If HEAD is `for_commit` exactly, or 1–2 commits ahead with only `wip(...)` between them, the cue is current. If HEAD is more commits ahead OR includes any `agreed(...)` / `plan(...)` / `chapter(...)` / `lockstep(...)` since `for_commit`, treat this cue as **stale** and use STATE.md `next_action` instead.
+> This cue updates only at coarse checkpoints (phase / batch / session boundaries). The live workflow status lives in [[STATE|`_workflow/STATE.md`]] and updates at every WIP / AGREED commit. **Before pasting:** compare this cue's `for_commit` (`b1fc121`) against `git rev-parse HEAD`. If HEAD is `for_commit` exactly, or 1–2 commits ahead with only `wip(...)` between them, the cue is current. If HEAD is more commits ahead OR includes any `agreed(...)` / `plan(...)` / `chapter(...)` / `lockstep(...)` since `for_commit`, treat this cue as **stale** and use STATE.md `next_action` instead.
 
-When the user starts a fresh Claude Code session after the Ch 5 Batch-3 close (commits up through `f7f5bd7 agreed(5/5_9_deployment_runtime)`), this is the first prompt to run. Paste it verbatim.
+When the user starts a fresh Claude Code session after the Ch 5 Batch-3 close (`f7f5bd7 agreed(5/5_9_deployment_runtime)`) plus the workflow-change lockstep at `b1fc121 lockstep(workflow): codex-writer default + writer-only revisions + conflict role split by writer`, this is the first prompt to run. Paste it verbatim.
 
 > [!important] New post-2026-05-02 workflow rules apply for Batch 4 forward
 > A workflow change landed at the lockstep commit just before this cue: (a) writer ratio defaults to codex-writer; cc-writer reserved for chapter-classified contested-framing/high-judgment-synthesis sections, **locked at Phase 3, no mid-run fallback**; (b) all section-content writing — drafts AND revisions — goes through writers; the `main-direct: minor` and `main-direct: adjudication` audit tags are **deprecated**; only `main-direct: writer-overhead` survives with a narrow definition (spelling / duplicated word / broken Markdown / format artifact — no semantic changes); (c) Phase 5 conflict role splits by writer model — cc-drafted sections continue under bidirectional codex-collaborator CONFLICT every round (Path A), codex-drafted sections get main session as conflictor for rounds 1..N-1 with a codex-collaborator final-round sanity pass at round N (Path B), with re-pass on any fix; (d) Rule 3a rewritten (codex-default), Rule 3b unchanged (content-risk-triggered), Rule 3c folded into main's Path B prompt with four named axes preserved, Rule 3d kept and strengthened with persistent critique IDs across rounds. **For §5.10 specifically: it was classified cc-writer at Phase 3 (high-judgment synthesis), so it runs Path A — same shape as §§5.4, 5.6, 5.7, 5.9 prior cc-drafted sections — except no `main-direct: minor / adjudication` is available even for single-sentence revisions; everything goes through cc-writer dispatch.** See `_workflow/subagents_design.md` Phase 5 + §8 + §5, `CLAUDE.md` "Subagents and the per-chapter pipeline" section, and memory `feedback_phase5_revisions.md` / `feedback_writer_subagents.md` / `feedback_subagent_design.md` for the full rule set.
@@ -26,7 +26,7 @@ Before dispatching:
 
 1. Read `_workflow/STATE.md` end-to-end and verify `last_known_head` matches `git rev-parse HEAD`. If they differ, trust git over STATE.md.
 
-2. Verify infrastructure: (a) `git status --porcelain` is empty in main repo; (b) `../auto-driving-codex-worktree` is on `codex-writer-isolated`, currently at `55d2c32` (~3 commits behind main HEAD `f7f5bd7`); ff-only the worktree to current main HEAD for hygiene before Batch 4 (`cd ../auto-driving-codex-worktree && git merge --ff-only main`); (c) `.claude/active_writer_batch.json` does NOT exist (no stale sentinel).
+2. Verify infrastructure: (a) `git status --porcelain` is empty in main repo; (b) `../auto-driving-codex-worktree` is on `codex-writer-isolated`, currently at `55d2c32` (~3 commits behind main HEAD `b1fc121`); ff-only the worktree to current main HEAD for hygiene before Batch 4 (`cd ../auto-driving-codex-worktree && git merge --ff-only main`); (c) `.claude/active_writer_batch.json` does NOT exist (no stale sentinel).
 
 3. Read `_workflow/plans/ch5_chapter_plan.md` Item 1 §5.10 row + Item 4 §5.10 (cc-writer per Rule 3a high-judgment synthesis) + Item 5 §5.10 contract (the per-section failure-mode catalog row schema + cross-section `5_cross.fm.*` IDs that §5.10 owns) + Item 9 terminology contract.
 
@@ -56,7 +56,7 @@ If any infrastructure check fails, stop and tell me — do not work around it.
 
 ## Session-end state (for reference)
 
-- Last commit: `f7f5bd7 agreed(5/5_9_deployment_runtime): per-section deal-loop complete`
+- Last commit: `b1fc121 lockstep(workflow): codex-writer default + writer-only revisions + conflict role split by writer` (preceded by `f7f5bd7 agreed(5/5_9_deployment_runtime): per-section deal-loop complete`)
 - Working tree: clean.
 - Worktree (`../auto-driving-codex-worktree`): on `codex-writer-isolated`, currently at `55d2c32` (was at `32884a9`; ff'd before Batch 3 dispatch after deleting 3 stale Batch-2 leftover files verified byte-identical to round-1 wip commits). Now ~3 commits behind main HEAD; ff to main before any Batch 4 codex-writer dispatch (cc-writer alone for §5.10, so technically optional this round).
 - Memory: no new rules established this batch. The §5.9 deal-loop validated the Phase-5 discipline working as designed (cc-writer re-dispatch caught the multi-axis revision; main-direct minor caught the single-sentence factual fix).

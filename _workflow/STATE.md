@@ -2,8 +2,8 @@
 title: Workflow state snapshot
 doc_type: state-snapshot
 state_kind: manual_snapshot
-last_updated: 2026-05-02T22:00:00.000Z
-last_checked_commit: f7f5bd7
+last_updated: 2026-05-02T23:30:00.000Z
+last_checked_commit: b1fc121
 generated_from: main_session
 ---
 
@@ -14,7 +14,7 @@ generated_from: main_session
 
 ## Mechanical state (auto-refreshed by PreCompact hook)
 
-- last_known_head: `f7f5bd7`
+- last_known_head: `b1fc121`
 - worktree_status: clean (main: clean; codex worktree: clean and ff'd to `55d2c32` — was at `32884a9` with 3 stale Batch-2 leftovers, cleaned + ff'd before §5.9 cc-writer dispatch; behind main HEAD by ~3 commits since the Batch-3 deal-loop ran on main)
 - active_batch_sentinel: null
 
