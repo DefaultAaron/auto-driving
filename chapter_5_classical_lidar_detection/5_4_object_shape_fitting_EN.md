@@ -26,9 +26,7 @@ That last point is the section's load-bearing argument. **Cluster quality and bo
 
 ## Prerequisites, restated inline
 
-Shape fitting consumes a cluster of non-ground points in `base_link` (the §5.1 output frame), each cluster representing a candidate object after [[5_2_ground_segmentation_EN|§5.2]] and [[5_3_clustering_EN|§5.3]]. We assume points are gravity-aligned — a fair assumption once `base_link` extrinsics and roll/pitch are correct ([[1_1_coordinate_frames_EN|Ch 1 §1.1]], [[1_3_lidar_calibration_EN|Ch 1 §1.3]]). Yaw in this section means rotation about the `base_link` z-axis; the BEV plane is the (x, y) plane. We treat `l` as the length along the box's local x-axis (the heading direction) and `w` as the width along its local y-axis, with `h` along z.
-
-The geometric primitives we lean on are: 2D convex hull of the BEV-projected cluster (Graham scan or monotone-chain, `O(N log N)`), eigendecomposition of a 2×2 covariance, and the rotating-calipers traversal of a convex polygon.
+Shape fitting consumes a cluster of non-ground points in `base_link` after [[5_2_ground_segmentation_EN|§5.2]] / [[5_3_clustering_EN|§5.3]], gravity-aligned per the §5.1 frame contract ([[1_1_coordinate_frames_EN|Ch 1 §1.1]], [[1_3_lidar_calibration_EN|Ch 1 §1.3]]). Yaw is rotation about z; `l` is along the box's local x-axis (heading), `w` along local y, `h` along z. The geometric primitives this section uses are 2D convex hull (`O(N log N)`), 2×2 eigendecomposition, and rotating-calipers traversal of a convex polygon.
 
 ## L-shape fitting (Zhang 2017) — the workhorse for vehicles
 
@@ -36,48 +34,16 @@ A LiDAR sweep almost never sees a full vehicle. From any pose other than directl
 
 Zhang, Wang, Wei & Wang (IV 2017) proposed a **search-based fit**: rotate a candidate yaw `θ` from 0 to π/2 (90° covers all rectangle orientations by symmetry), project the cluster onto the rotated axes, and score how well the projected points form an L. The yaw with the best score wins; the box dimensions fall out of the projection extents.
 
-The objective is a function over `θ ∈ [0, π/2)`. For each `θ`, rotate every BEV point `p_i = (x_i, y_i)` by `−θ`, compute `c1_i = x_i cos θ + y_i sin θ` and `c2_i = −x_i sin θ + y_i cos θ`, and look at the four box edges defined by `min(c1)`, `max(c1)`, `min(c2)`, `max(c2)`. Each cluster point is closest to one of those four edges. Zhang's paper gives three candidate scoring criteria:
-
-```text
-1. Area:        minimize the rectangle area (l · w) — favors the tightest enclosing rectangle.
-2. Closeness:   for each point, take its distance to the nearest of the four edges,
-                and minimize Σ d_i (or maximize Σ 1/(d_i + ε)) — favors points lying
-                on the rectangle's perimeter.
-3. Variance:    bin points by which edge they belong to, and minimize the variance
-                of distance-to-edge within each bin — favors crisp, well-separated edges.
-```
-
-The closeness criterion is the common pedagogical default for vehicles because it directly rewards the "L lies on the box's two visible faces" intuition; production stacks vary, with Autoware's `autoware_shape_estimation` and many proprietary stacks tuning a closeness-style objective per ODD. Search resolution is typically 1° or 0.5°; a coarse-to-fine pass (5° → 0.5°) is cheap. The full sweep is `O(N · K)` for `N` points and `K` yaw candidates, and runs in well under a millisecond per cluster on a modern CPU at automotive cluster sizes.
-
-Once `θ*` is chosen, the box dimensions and centroid follow directly:
-
-```text
-l = max(c1) − min(c1)
-w = max(c2) − min(c2)
-center_xy = R(θ*) · (½(min(c1)+max(c1)), ½(min(c2)+max(c2)))
-```
-
-with `z` and `h` taken from the cluster's vertical extent. The optional class is left as `unknown` unless an upstream cue assigns it.
+The objective is a function over `θ ∈ [0, π/2)`. For each `θ`, project every BEV point onto rotated axes and score how the cluster sits relative to the four edges of the implied rectangle. Zhang's paper gives three scoring criteria — *area* (minimize the rectangle area), *closeness* (minimize sum of distances from each point to the nearest of the four edges), and *variance* (minimize per-edge distance variance). The **closeness** criterion is the common pedagogical default for vehicles because it directly rewards the "L lies on the box's two visible faces" intuition; production stacks vary, with Autoware's `autoware_shape_estimation` and many proprietary stacks tuning a closeness-style objective per ODD. Search resolution is typically 1° or 0.5°; coarse-to-fine (5° → 0.5°) is cheap. Once `θ*` is found, `l` and `w` come from the projected extents, the centroid is the rotated midpoint of the projection box, and `z` / `h` come from the cluster's vertical extent. The full sweep is `O(N · K)` and runs sub-millisecond per cluster on a modern CPU at automotive cluster sizes. The optional class is left as `unknown` unless an upstream cue assigns it.
 
 > [!tip] RANSAC L-fit, in one paragraph
 > A second classical option fits two perpendicular lines via RANSAC: sample a pair of points, hypothesize a line, count inliers, then fit a perpendicular partner from the remaining points. It is cheap when the cluster has clear corner geometry. It is **not** a graceful fallback on barely-L-shaped clusters: with only one face visible the perpendicular partner is unconstrained, and the algorithm will hallucinate a partner along whatever direction the residual points happen to support, producing a confident-looking but spurious yaw. For single-face-only clusters the right move is not RANSAC L-fit but a velocity / lane prior from the §5.5 tracker (see `5_4.fm.l_pointing_wrong_way` below) or low yaw confidence. Production code that ships Zhang as the default usually keeps a RANSAC L-fit available as a same-interface alternative for ablation and for clusters with crisp corners but few points.
 
 ## PCA / OBB — the cheap fallback
 
-Principal Component Analysis on the 2D BEV cluster gives an oriented bounding box almost for free. Compute the cluster's BEV centroid, form the 2×2 covariance matrix `C` of demeaned points, take its eigendecomposition, align the box axes with the eigenvectors, and read `l` and `w` from the projected extents along those axes.
+Principal Component Analysis on the 2D BEV cluster gives an oriented bounding box almost for free. Demean, form the 2×2 covariance, eigendecompose, align the box axes with the eigenvectors, and read `l` and `w` from the projected extents. PCA is `O(N)` plus a 2×2 eig, fast enough for a hot path, and works adequately for elongated, well-sampled clusters — a lone vehicle seen broadside at close range with a clean ring pattern.
 
-```text
-μ      = mean(p_i)
-C      = (1/N) Σ (p_i − μ)(p_i − μ)ᵀ
-{λ₁ ≥ λ₂}, {v₁, v₂} = eig(C)
-yaw    = atan2(v₁.y, v₁.x)
-```
-
-PCA is fast (`O(N)` plus a 2×2 eig), differentiable if you ever need it, and works adequately for elongated, well-sampled clusters. It is the right answer for a lone vehicle seen broadside at close range with a clean ring pattern.
-
-It is also where the **yaw-instability failure mode lives**. PCA picks the eigenvector of *largest variance*, which assumes the longer side of the actor produced more points. For an L-shaped cluster, the longer arm is not necessarily aligned with the actor's heading — and for symmetric or near-cylindrical clusters (the rear of a sedan seen head-on, a person, a barrel), `λ₁ ≈ λ₂` and the yaw the eigendecomposition returns is essentially noise. Across two consecutive frames, that noise can flip the chosen axis by 90°. The downstream tracker then sees a "rotation" that did not happen, and prediction goes sideways.
-
-PCA / OBB is therefore best framed as the cheap fallback for clusters whose shape is too sparse or too irregular for L-shape fitting to lock onto a corner. Use it consciously, not by default.
+It is also where the **yaw-instability failure mode lives**. PCA picks the eigenvector of *largest variance*, which assumes the longer side of the actor produced more points. For an L-shaped cluster the longer arm is not necessarily aligned with the actor's heading; for symmetric or near-cylindrical clusters (the rear of a sedan seen head-on, a person, a barrel), `λ₁ ≈ λ₂` and the returned yaw is essentially noise. Across two consecutive frames that noise can flip the chosen axis by 90°, the tracker sees a phantom rotation, and prediction goes sideways. PCA / OBB is therefore the cheap fallback for clusters whose shape is too sparse or too irregular for L-shape fitting to lock onto a corner — used consciously, not by default.
 
 ## Min-area rectangle — the convex-hull optimum
 
@@ -136,8 +102,9 @@ with semantics:
 The binding tuple does not change between sections — §5.5 / Ch 7 / Ch 8 read exactly those eight fields. Mitigations in the failure-mode catalog below reference internal diagnostics and per-message side-channel metadata that ride **alongside** the tuple as ROS2 message fields or per-track diagnostics, not as additions to the tuple itself:
 
 - `extent_source ∈ {visible_only, class_prior_backfill}` — set by §5.4; consumed by §5.5 to decide whether the tracker should accumulate extent before promoting class confidence.
+- `class_prior_source ∈ {none, dimension_lookup, upstream_class, tracker_history}` — when `extent_source = class_prior_backfill`, this names *how* the prior was selected so §5.5 can downweight class confidence when the prior was a gross-dimension guess (`dimension_lookup`) versus a tracker-confirmed history.
 - `yaw_confidence ∈ [0, 1]` — set by §5.4 from L-shape corner strength and PCA eigenvalue ratio; consumed by §5.5 to gate yaw-rate updates and switch to a tracker-supplied yaw prior when low.
-- `corner_visibility ∈ {two_corners, one_corner, no_corner}` — set by §5.4 from hull edge counts; consumed by §5.5 and §5.10 diagnostics.
+- `corner_visibility ∈ {two_corners, one_corner, no_corner}` — set by §5.4 from hull edge counts. In vehicle terms: `two_corners` is the canonical L-shape, two adjacent faces meeting at one near-90° corner *and* clearly terminated at both far ends (rare in practice — needs a broadside view of a finite-length actor); `one_corner` is the typical L (two adjacent faces, one shared corner, one or both far ends extending past the visible cluster); `no_corner` is a single visible face (a vehicle directly ahead, ego following) where no perpendicular partner is in the cluster.
 
 These side-channel fields are **diagnostics, not part of the binding tuple**, and §5.5 must function correctly when they are absent (e.g., from a different shape-fitting implementation) by treating them as `unknown / unset`. Convex hull travels alongside as an *optional footprint payload* (see above) for planners that consume polygons.
 
