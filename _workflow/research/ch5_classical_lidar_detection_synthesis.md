@@ -327,7 +327,7 @@ Per `feedback_update_in_lockstep.md` and the spec's Phase-2 protocol, the follow
 
 1. `00_table_of_contents.md` — insert a 5.4 row "Object-shape fitting — L-shape, OBB, class priors"; shift 5.4→5.5 ... 5.9→5.10 with their wikilinks updated to the new file slugs; rename the (renumbered) §5.7 row to "Occupancy, free-space & map-aided ROI gating."
 2. `chapter_5_classical_lidar_detection/5_0_overview_EN.md` — same renumbering in the section table; insert §5.4 row; rename §5.7 row; update learning-objectives bullets to add a shape-fitting bullet and broaden the occupancy bullet to include map-aided ROI; update the abstract to mention "fit" in the pipeline narrative and "map-aided ROI gating" in the content list.
-3. `chapter_5_classical_lidar_detection/5_0_overview_ZH.md` — mirrored renumber + rename + abstract update.
+3. `chapter_5_classical_lidar_detection/5_0_概览_ZH.md` — mirrored renumber + rename + abstract update.
 4. `README.md` §8 row 5 — update section count from `10` to `11`; update the parenthetical chapter description to mention shape fitting and ROI gating.
 
 Memory and `CLAUDE.md` do not need touch-ups for a section-count change or a section rename inside an existing chapter (the canonical 13-chapter outline is unchanged).

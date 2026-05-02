@@ -42,7 +42,16 @@ Folders prefixed with `_` are support, not content.
 
 ## 2. File naming
 
-`N_M_short_slug_LANG.md` — `N` chapter (0–12), `M` section (0 = chapter overview), `LANG` ∈ `{EN, ZH}`. Each section = two files. Underscore suffix `_EN` / `_ZH` (not dotted) keeps Obsidian wikilinks clean.
+`N_M_<slug>_LANG.md` — `N` chapter (0–12), `M` section (0 = chapter overview), `LANG` ∈ `{EN, ZH}`. Each section = two files. Underscore suffix `_EN` / `_ZH` (not dotted) keeps Obsidian wikilinks clean.
+
+**Slug language matches LANG**:
+
+- `_EN.md` → English slug (lowercase, underscore-separated, e.g. `5_1_pointcloud_preprocessing_EN.md`).
+- `_ZH.md` → Chinese slug — a stable, idiomatic Chinese rendering of the section title. Idiomatic Chinese technical terms stay Chinese (`激光雷达`, `点云`, `占据栅格`); ASCII product names and library names stay ASCII (`ROS2`, `PCL`, `Eigen`, `LiDAR` if the project uses the English form). Examples: `5_0_概览_ZH.md`, `5_1_点云预处理_ZH.md`, `5_8_ROS2_集成_ZH.md`. Pairing between `_EN.md` and `_ZH.md` of the same section is enforced by the `N_M` numbering plus the `_LANG` suffix, **not** by literal slug translation.
+
+Chapter-overview slug is uniformly `概览` across all 13 chapters (so `<N>_0_概览_ZH.md` everywhere).
+
+**Recommended git ergonomics:** `git config core.quotepath false` so `git status` / `git log` displays Chinese filenames as readable characters instead of `\xx\xx` octal escapes.
 
 ---
 

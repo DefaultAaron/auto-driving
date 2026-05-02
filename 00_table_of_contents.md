@@ -21,14 +21,14 @@ tags:
 
 ## Chapter 0 — Book Overview
 
-- [ ] 0.0 Overview · [[0_0_overview_EN|EN]] ◐ · [[0_0_overview_ZH|ZH]] ◐
+- [ ] 0.0 Overview · [[0_0_overview_EN|EN]] ◐ · [[0_0_概览_ZH|ZH]] ◐
 - [ ] 0.1 How to use this book · [[0_1_how_to_use_EN|EN]] ○ · [[0_1_how_to_use_ZH|ZH]] ○
 - [ ] 0.2 Roadmap & goals · [[0_2_roadmap_and_goals_EN|EN]] ○ · [[0_2_roadmap_and_goals_ZH|ZH]] ○
 - [ ] 0.3 The mingtai project as a worked example · [[0_3_mingtai_as_example_EN|EN]] ○ · [[0_3_mingtai_as_example_ZH|ZH]] ○
 
 ## Chapter 1 — Foundations
 
-- [ ] 1.0 Overview · [[1_0_overview_EN|EN]] ◐ · [[1_0_overview_ZH|ZH]] ◐
+- [ ] 1.0 Overview · [[1_0_overview_EN|EN]] ◐ · [[1_0_概览_ZH|ZH]] ◐
 - [ ] 1.1 Coordinate frames & TF2 · [[1_1_coordinate_frames_EN|EN]] ○ · [[1_1_coordinate_frames_ZH|ZH]] ○
 - [ ] 1.2 Camera intrinsics / extrinsics calibration · [[1_2_camera_calibration_EN|EN]] ○ · [[1_2_camera_calibration_ZH|ZH]] ○
 - [ ] 1.3 LiDAR calibration & point-cloud basics · [[1_3_lidar_calibration_EN|EN]] ○ · [[1_3_lidar_calibration_ZH|ZH]] ○
@@ -43,7 +43,7 @@ tags:
 
 ## Chapter 2 — Localization, Mapping & Ego-State Estimation
 
-- [ ] 2.0 Overview · [[2_0_overview_EN|EN]] ◐ · [[2_0_overview_ZH|ZH]] ◐
+- [ ] 2.0 Overview · [[2_0_overview_EN|EN]] ◐ · [[2_0_概览_ZH|ZH]] ◐
 - [ ] 2.1 Ego-state estimation — odometry / IMU / GNSS basics, time-sync hygiene · [[2_1_ego_state_estimation_EN|EN]] ○ · [[2_1_ego_state_estimation_ZH|ZH]] ○
 - [ ] 2.2 GNSS / INS / IMU fusion — EKF / UKF / factor graphs · [[2_2_gnss_ins_imu_fusion_EN|EN]] ○ · [[2_2_gnss_ins_imu_fusion_ZH|ZH]] ○
 - [ ] 2.3 LiDAR-based localization — scan-to-map, NDT / ICP localization · [[2_3_lidar_localization_EN|EN]] ○ · [[2_3_lidar_localization_ZH|ZH]] ○
@@ -57,7 +57,7 @@ tags:
 
 ## Chapter 3 — Object Detection Fundamentals + YOLO Conceptual Lineage
 
-- [ ] 3.0 Overview · [[3_0_overview_EN|EN]] ◐ · [[3_0_overview_ZH|ZH]] ◐
+- [ ] 3.0 Overview · [[3_0_overview_EN|EN]] ◐ · [[3_0_概览_ZH|ZH]] ◐
 - [ ] 3.1 Problem framing — boxes, labels, IoU, confidence · [[3_1_problem_framing_EN|EN]] ○ · [[3_1_problem_framing_ZH|ZH]] ○
 - [ ] 3.2 Loss intuition for detection · [[3_2_loss_intuition_EN|EN]] ○ · [[3_2_loss_intuition_ZH|ZH]] ○
 - [ ] 3.3 Data — datasets, augmentation, label noise · [[3_3_data_and_augmentation_EN|EN]] ○ · [[3_3_data_and_augmentation_ZH|ZH]] ○
@@ -66,7 +66,7 @@ tags:
 
 ## Chapter 4 — Comprehensive Camera Perception Systems for AD
 
-- [ ] 4.0 Overview · [[4_0_overview_EN|EN]] ◐ · [[4_0_overview_ZH|ZH]] ◐
+- [ ] 4.0 Overview · [[4_0_overview_EN|EN]] ◐ · [[4_0_概览_ZH|ZH]] ◐
 - [ ] 4.1 YOLO family as deployed systems (v3 / v5 / v8 + user's "YOLO26") · [[4_1_yolo_deployed_systems_EN|EN]] ○ · [[4_1_yolo_deployed_systems_ZH|ZH]] ○
 - [ ] 4.2 DETR family lineage · [[4_2_detr_family_EN|EN]] ○ · [[4_2_detr_family_ZH|ZH]] ○
 - [ ] 4.3 Real-time DETRs — RT-DETR, DEIM, D-FINE · [[4_3_real_time_detrs_EN|EN]] ○ · [[4_3_real_time_detrs_ZH|ZH]] ○
@@ -82,7 +82,7 @@ tags:
 
 ## Chapter 5 — Classical LiDAR Detection
 
-- [ ] 5.0 Overview · [[5_0_overview_EN|EN]] ◐ · [[5_0_overview_ZH|ZH]] ◐
+- [ ] 5.0 Overview · [[5_0_overview_EN|EN]] ◐ · [[5_0_概览_ZH|ZH]] ◐
 - [ ] 5.1 Point-cloud preprocessing · [[5_1_pointcloud_preprocessing_EN|EN]] ○ · [[5_1_pointcloud_preprocessing_ZH|ZH]] ○
 - [ ] 5.2 Ground segmentation (RANSAC etc.) · [[5_2_ground_segmentation_EN|EN]] ○ · [[5_2_ground_segmentation_ZH|ZH]] ○
 - [ ] 5.3 Clustering — Euclidean, DBSCAN · [[5_3_clustering_EN|EN]] ○ · [[5_3_clustering_ZH|ZH]] ○
@@ -96,7 +96,7 @@ tags:
 
 ## Chapter 6 — Deep-Learning LiDAR Detection
 
-- [ ] 6.0 Overview · [[6_0_overview_EN|EN]] ◐ · [[6_0_overview_ZH|ZH]] ◐
+- [ ] 6.0 Overview · [[6_0_overview_EN|EN]] ◐ · [[6_0_概览_ZH|ZH]] ◐
 - [ ] 6.1 PointNet / PointNet++ · [[6_1_pointnet_EN|EN]] ○ · [[6_1_pointnet_ZH|ZH]] ○
 - [ ] 6.2 VoxelNet / SECOND · [[6_2_voxelnet_second_EN|EN]] ○ · [[6_2_voxelnet_second_ZH|ZH]] ○
 - [ ] 6.3 PointPillars · [[6_3_pointpillars_EN|EN]] ○ · [[6_3_pointpillars_ZH|ZH]] ○
@@ -108,7 +108,7 @@ tags:
 
 ## Chapter 7 — Camera + LiDAR Sensor Fusion (Goal 1)
 
-- [ ] 7.0 Overview · [[7_0_overview_EN|EN]] ◐ · [[7_0_overview_ZH|ZH]] ◐
+- [ ] 7.0 Overview · [[7_0_overview_EN|EN]] ◐ · [[7_0_概览_ZH|ZH]] ◐
 - [ ] 7.1 Calibration & sync revisited · [[7_1_calibration_sync_revisited_EN|EN]] ○ · [[7_1_calibration_sync_revisited_ZH|ZH]] ○
 - [ ] 7.2 Early / mid / late fusion designs · [[7_2_fusion_designs_EN|EN]] ○ · [[7_2_fusion_designs_ZH|ZH]] ○
 - [ ] 7.3 BEV paradigm — BEVFormer / BEVFusion · [[7_3_bev_paradigm_EN|EN]] ○ · [[7_3_bev_paradigm_ZH|ZH]] ○
@@ -120,7 +120,7 @@ tags:
 
 ## Chapter 8 — Classical Motion Planning, Prediction & Control
 
-- [ ] 8.0 Overview · [[8_0_overview_EN|EN]] ◐ · [[8_0_overview_ZH|ZH]] ◐
+- [ ] 8.0 Overview · [[8_0_overview_EN|EN]] ◐ · [[8_0_概览_ZH|ZH]] ◐
 - [ ] 8.1 Behavior planning & state machines · [[8_1_behavior_planning_EN|EN]] ○ · [[8_1_behavior_planning_ZH|ZH]] ○
 - [ ] 8.2 Classical prediction — CV / CTRV / IMM / social-force / rule-based · [[8_2_classical_prediction_EN|EN]] ○ · [[8_2_classical_prediction_ZH|ZH]] ○
 - [ ] 8.3 Graph search — A*, D*-Lite, hybrid A* · [[8_3_graph_search_EN|EN]] ○ · [[8_3_graph_search_ZH|ZH]] ○
@@ -133,7 +133,7 @@ tags:
 
 ## Chapter 9 — Deep-Learning Planning, Prediction & Control
 
-- [ ] 9.0 Overview · [[9_0_overview_EN|EN]] ◐ · [[9_0_overview_ZH|ZH]] ◐
+- [ ] 9.0 Overview · [[9_0_overview_EN|EN]] ◐ · [[9_0_概览_ZH|ZH]] ◐
 - [ ] 9.1 Imitation learning & behavior cloning · [[9_1_imitation_learning_EN|EN]] ○ · [[9_1_imitation_learning_ZH|ZH]] ○
 - [ ] 9.2 Reinforcement learning for driving · [[9_2_rl_for_driving_EN|EN]] ○ · [[9_2_rl_for_driving_ZH|ZH]] ○
 - [ ] 9.3 Learned trajectory prediction & multi-modal interaction · [[9_3_learned_prediction_EN|EN]] ○ · [[9_3_learned_prediction_ZH|ZH]] ○
@@ -144,7 +144,7 @@ tags:
 
 ## Chapter 10 — AD Data Engine, Labeling & ML Operations
 
-- [ ] 10.0 Overview · [[10_0_overview_EN|EN]] ◐ · [[10_0_overview_ZH|ZH]] ◐
+- [ ] 10.0 Overview · [[10_0_overview_EN|EN]] ◐ · [[10_0_概览_ZH|ZH]] ◐
 - [ ] 10.1 The data flywheel · [[10_1_data_flywheel_EN|EN]] ○ · [[10_1_data_flywheel_ZH|ZH]] ○
 - [ ] 10.2 Log mining & scenario selection · [[10_2_log_mining_EN|EN]] ○ · [[10_2_log_mining_ZH|ZH]] ○
 - [ ] 10.3 Labeling — manual + auto, QA, IAA · [[10_3_labeling_EN|EN]] ○ · [[10_3_labeling_ZH|ZH]] ○
@@ -158,7 +158,7 @@ tags:
 
 ## Chapter 11 — Safety, Validation & Operational Discipline
 
-- [ ] 11.0 Overview · [[11_0_overview_EN|EN]] ◐ · [[11_0_overview_ZH|ZH]] ◐
+- [ ] 11.0 Overview · [[11_0_overview_EN|EN]] ◐ · [[11_0_概览_ZH|ZH]] ◐
 - [ ] 11.1 ODD revisited · [[11_1_odd_revisited_EN|EN]] ○ · [[11_1_odd_revisited_ZH|ZH]] ○
 - [ ] 11.2 Hazard analysis & risk assessment (HARA) · [[11_2_hara_EN|EN]] ○ · [[11_2_hara_ZH|ZH]] ○
 - [ ] 11.3 Scenario-based testing · [[11_3_scenario_based_testing_EN|EN]] ○ · [[11_3_scenario_based_testing_ZH|ZH]] ○
@@ -171,7 +171,7 @@ tags:
 
 ## Chapter 12 — End-to-End Autonomous Driving (Capstone)
 
-- [ ] 12.0 Overview · [[12_0_overview_EN|EN]] ◐ · [[12_0_overview_ZH|ZH]] ◐
+- [ ] 12.0 Overview · [[12_0_overview_EN|EN]] ◐ · [[12_0_概览_ZH|ZH]] ◐
 - [ ] 12.1 Definition & taxonomy (resolves the open question) · [[12_1_definition_and_taxonomy_EN|EN]] ○ · [[12_1_definition_and_taxonomy_ZH|ZH]] ○
 - [ ] 12.2 UniAD & one-model paradigms · [[12_2_uniad_one_model_EN|EN]] ○ · [[12_2_uniad_one_model_ZH|ZH]] ○
 - [ ] 12.3 VLA & foundation-model drivers · [[12_3_vla_foundation_models_EN|EN]] ○ · [[12_3_vla_foundation_models_ZH|ZH]] ○

@@ -46,5 +46,5 @@ _Top 3–5 entries from [[reading_list]] that the reader should sample first._
 ## Cross-references
 - ⬅ Previous chapter: [[<prev chapter overview wikilink>]]
 - ➡ Next chapter: [[<next chapter overview wikilink>]]
-- 🌐 Other language: [[<N>_0_overview_ZH]]
+- 🌐 Other language: [[<N>_0_概览_ZH]]
 - 🗂 Master TOC: [[00_table_of_contents]]

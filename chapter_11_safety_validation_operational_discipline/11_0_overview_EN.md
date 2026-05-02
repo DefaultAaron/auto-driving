@@ -56,5 +56,5 @@ tags:
 ## Cross-references
 - ⬅ Previous: [[10_0_overview_EN]]
 - ➡ Next: [[12_0_overview_EN]]
-- 🌐 Other language: [[11_0_overview_ZH]]
+- 🌐 Other language: [[11_0_概览_ZH]]
 - 🗂 Master TOC: [[00_table_of_contents]]
