@@ -67,7 +67,7 @@ Generic Obstacle Detection is **a common classical safety pattern** rather than 
 
 ## HD-map ROI gating — the Apollo HDMap pattern
 
-The other half of the section is the dual question: given that the per-class detector and the occupancy fallback both run, *where* should they look? The HD-map answers this. A road network's drivable polygons (lanes, junctions, shoulders, parking) and non-drivable polygons (sidewalks, building footprints, off-road areas) are authored once at map-construction time and stored as polygons in the `map` frame.
+The other half of the section is the dual question: where should the **primary per-class detector** spend its compute? The HD-map answers this. A road network's drivable polygons (lanes, junctions, shoulders, parking) and non-drivable polygons (sidewalks, building footprints, off-road areas) are authored once at map-construction time and stored as polygons in the `map` frame. ROI gating shapes the input to the *primary detection path*; the occupancy / Generic Obstacle Detection fallback runs on an *ungated* (or ROI-dilated) domain so ROI-boundary misses are still caught — the survival argument later in this section makes that division explicit.
 
 Apollo's classical perception pipeline used the HDMap to produce, at startup or at map-tile load time, a **precomputed BEV ROI lookup table**: the drivable polygons are rasterized into a binary BEV grid at the same cell resolution as the occupancy grid, and each cell carries a single bit `is_in_ROI`. Cell-wise gating is then a constant-time lookup — no polygon-in-point geometry test on the hot path, no per-frame rasterization. The lookup table is parameterized by the ego's current map tile and is swapped as the vehicle drives between tiles.
 
