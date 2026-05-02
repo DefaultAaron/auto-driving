@@ -1,0 +1,53 @@
+---
+chapter: 6
+section: 0
+title: 深度学习激光雷达检测 — 概览
+language: ZH
+status: planned
+tags:
+  - book/section
+  - book/chapter-6
+  - book/overview
+  - lang/ZH
+---
+
+# 第 6 章 — 深度学习激光雷达检测
+
+> [!info] 状态与权威来源
+> Frontmatter 中的 `status` 字段是权威来源。[[00_table_of_contents|目录]] 中的状态标记为手动同步的展示副本。
+
+> [!abstract] 本章内容
+> 激光雷达目标检测的深度学习方法 —— [[5_0_overview_ZH|第 5 章 — 经典激光雷达检测]] 的现代替代或混合延伸:PointNet / PointNet++,基于体素的家族(VoxelNet / SECOND),柱状表示(PointPillars),anchor-free 检测头(CenterPoint),以及近期基于 Transformer 的 3D 检测器。本章末覆盖 3D 指标、部署与安全。
+
+## 学习目标
+- 比较点 / 体素 / 柱三种点云表征。
+- 在标准数据集上训练并评估 PointPillars / SECOND / CenterPoint 等变体。
+- 理解基于 Transformer 的 3D 检测器的作用。
+- 把握 3D 指标(KITTI、nuScenes NDS、Waymo APH)及其陷阱。
+- 把训练好的模型从 PyTorch 经 ONNX / TensorRT 部署到车端边缘 GPU 上的实时 C++ ROS2 节点。
+
+## 先修要求
+- [[5_0_overview_ZH|第 5 章 — 经典激光雷达检测]](概念与基线)
+- [[1_0_overview_ZH|第 1 章 — 基础知识]](尤其 §1.3 激光雷达基础、§1.6 评估、§1.9 部署目标)
+
+## 各小节
+| § | 标题 | 状态 (EN) | 状态 (ZH) |
+|---|-------|:-----------:|:-----------:|
+| 6.0 | 概览(本页) | ◐ | ◐ |
+| 6.1 | PointNet / PointNet++ | ○ | ○ |
+| 6.2 | VoxelNet / SECOND | ○ | ○ |
+| 6.3 | PointPillars | ○ | ○ |
+| 6.4 | CenterPoint 与 anchor-free 3D 检测 | ○ | ○ |
+| 6.5 | 基于 Transformer 的 3D 检测器 | ○ | ○ |
+| 6.6 | 3D 检测的评估指标 | ○ | ○ |
+| 6.7 | 部署 | ○ | ○ |
+| 6.8 | 安全与验证(模板实例) | ○ | ○ |
+
+## 延伸阅读
+- _见 [[reading_list]] 第 6 章相关条目(PointNet / PointPillars / CenterPoint / transformer-3D,KITTI / nuScenes / Waymo)_。
+
+## 相关链接
+- ⬅ 上一章: [[5_0_overview_ZH]]
+- ➡ 下一章: [[7_0_overview_ZH]]
+- 🌐 其他语言版本: [[6_0_overview_EN]]
+- 🗂 目录总表: [[00_table_of_contents]]

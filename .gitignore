@@ -1,0 +1,15 @@
+# Obsidian transient state
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+
+# Claude Code machine-local settings
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Graphify intermediate artifacts
+.graphify/

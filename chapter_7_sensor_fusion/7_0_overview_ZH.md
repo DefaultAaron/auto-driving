@@ -1,0 +1,56 @@
+---
+chapter: 7
+section: 0
+title: 相机 + 激光雷达传感器融合 — 概览
+language: ZH
+status: planned
+tags:
+  - book/section
+  - book/chapter-7
+  - book/overview
+  - lang/ZH
+---
+
+# 第 7 章 — 相机 + 激光雷达传感器融合(AD 感知的"目标一")
+
+> [!info] 状态与权威来源
+> Frontmatter 中的 `status` 字段是权威来源。[[00_table_of_contents|目录]] 中的状态标记为手动同步的展示副本。
+
+> [!abstract] 本章内容
+> 把相机与激光雷达感知整合为下游预测 / 规划可消费的统一环境表示 —— AD 栈中感知层的"目标一"。重温标定与时间同步;前融合 / 中融合 / 后融合;BEV 范式(BEVFormer、BEVFusion);注意力融合(TransFusion);明确融合输出(tracks + 不确定性)与下游预测(第 8 / 9 章)之间的边界。
+
+## 学习目标
+- 在给定任务与延迟预算下,在前 / 中 / 后融合之间做选择。
+- 复现一个 BEV 范式的融合模型(BEVFormer / BEVFusion)。
+- 说明 TransFusion 如何处理模态对齐问题。
+- 定义"融合 — 预测"边界:`tracks + 不确定性`应当呈现什么形式。
+- 诊断融合常见失败模式(标定漂移、时间同步偏差、遮挡处理不当)。
+- 把融合栈从 PyTorch 经 ONNX / TensorRT 部署到 ROS2 + 边缘 GPU。
+
+## 先修要求
+- [[4_0_overview_ZH|第 4 章 — 面向自动驾驶的相机感知系统综述]]
+- [[6_0_overview_ZH|第 6 章 — 深度学习激光雷达检测]]
+- [[2_0_overview_ZH|第 2 章 — 定位]](融合运行在定位后的世界系下)
+- [[1_0_overview_ZH|第 1 章 — 基础知识]](尤其 §1.2 相机标定、§1.3 激光雷达标定、§1.4 同步)
+
+## 各小节
+| § | 标题 | 状态 (EN) | 状态 (ZH) |
+|---|-------|:-----------:|:-----------:|
+| 7.0 | 概览(本页) | ◐ | ◐ |
+| 7.1 | 标定与同步回顾 | ○ | ○ |
+| 7.2 | 前 / 中 / 后融合设计 | ○ | ○ |
+| 7.3 | BEV 范式 — BEVFormer / BEVFusion | ○ | ○ |
+| 7.4 | 注意力融合 — TransFusion | ○ | ○ |
+| 7.5 | 融合输出:tracks + 不确定性,供下游预测使用 | ○ | ○ |
+| 7.6 | 评估与失败模式 | ○ | ○ |
+| 7.7 | 部署 | ○ | ○ |
+| 7.8 | 安全与验证(模板实例) | ○ | ○ |
+
+## 延伸阅读
+- _见 [[reading_list]] 第 7 章相关条目(BEVFormer / BEVFusion / TransFusion / PETR / nuScenes 融合基准)_。
+
+## 相关链接
+- ⬅ 上一章: [[6_0_overview_ZH]]
+- ➡ 下一章: [[8_0_overview_ZH]]
+- 🌐 其他语言版本: [[7_0_overview_EN]]
+- 🗂 目录总表: [[00_table_of_contents]]

@@ -1,0 +1,59 @@
+---
+chapter: 4
+section: 0
+title: 面向自动驾驶的相机感知系统综述 — 概览
+language: ZH
+status: planned
+tags:
+  - book/section
+  - book/chapter-4
+  - book/overview
+  - lang/ZH
+---
+
+# 第 4 章 — 面向自动驾驶的相机感知系统综述
+
+> [!info] 状态与权威来源
+> Frontmatter 中的 `status` 字段是权威来源。[[00_table_of_contents|目录]] 中的状态标记为手动同步的展示副本。
+
+> [!abstract] 本章内容
+> 面向 AD 的现代相机感知作为**部署系统**:完整 YOLO 家族(v3 / v5 / v8 + 用户的 "YOLO26")、DETR 谱系及其实时变体(RT-DETR、DEIM、D-FINE)、anchor-free 检测器(FCOS / CenterNet / RTMDet)、开放词汇 / 基于文本的检测、多目标跟踪、**稠密相机感知**(分割 + 在线 HD-map 估计含 MapTR)、**单目与多相机 3D 感知**(FCOS3D、纯相机 BEV、占据 / 场景补全)、**面向感知的基础模型特征**(DINOv2、SAM、CLIP)、AD 特定感知目标(含 mingtai 红绿灯端到端走读)、跨模型家族通用的部署模式,以及"安全与验证"模板实例。
+
+## 学习目标
+- 梳理 YOLO 家族(部署系统视角)与 DETR 谱系;解释为何会出现实时 DETR。
+- 在 anchor-based、anchor-free、query-based、open-vocabulary 之间选型。
+- 在检测器输出上接入 MOT(ByteTrack / OC-SORT / BoT-SORT)。
+- 把稠密相机感知(分割 + 在线向量地图)视为与框检测同级的范式。
+- 推理单目与多相机 3D 感知(FCOS3D、纯相机 BEV、占据 / 场景补全)—— 何时纯相机 3D 够用、何时需要融合。
+- 用基础模型特征(DINOv2 / SAM / CLIP)作为编码器、标签放大器或开放词汇骨干。
+- 端到端走读 mingtai 红绿灯任务上的真实 YOLO 模型:PyTorch 训练 → ONNX → TensorRT → C++ ROS2 节点。
+
+## 先修要求
+- [[3_0_overview_ZH|第 3 章 — 目标检测基础与 YOLO 思想脉络]](理论)
+- [[2_0_overview_ZH|第 2 章 — 定位]](多相机环视感知会引用本体位姿与坐标系)
+
+## 各小节
+| § | 标题 | 状态 (EN) | 状态 (ZH) |
+|---|-------|:-----------:|:-----------:|
+| 4.0 | 概览(本页) | ◐ | ◐ |
+| 4.1 | 作为部署系统的 YOLO 家族(v3 / v5 / v8 + 用户的 "YOLO26") | ○ | ○ |
+| 4.2 | DETR 谱系(DETR → Deformable → DAB → DN → DINO) | ○ | ○ |
+| 4.3 | 实时 DETR — RT-DETR、DEIM、D-FINE | ○ | ○ |
+| 4.4 | 其他现代检测器 — FCOS、CenterNet、RTMDet | ○ | ○ |
+| 4.5 | 开放词汇与基于文本的检测 — OWL-ViT、GroundingDINO | ○ | ○ |
+| 4.6 | 多目标跟踪 — ByteTrack、OC-SORT、BoT-SORT | ○ | ○ |
+| 4.7 | 稠密相机感知 — 语义 / 实例 / 全景分割(Mask2Former)、在线 HD-map 估计(MapTR) | ○ | ○ |
+| 4.8 | 单目与多相机 3D 感知 — FCOS3D、深度、纯相机 BEV(PETR / BEVFormer 纯相机)、占据与语义场景补全 | ○ | ○ |
+| 4.9 | 面向 AD 感知的基础模型特征 — DINOv2、SAM、CLIP 风格编码器、伪标签放大 | ○ | ○ |
+| 4.10 | AD 特定目标 — 车辆 / 行人 / 骑行者 / 标志 / 路障;**红绿灯端到端走读**(mingtai) | ○ | ○ |
+| 4.11 | 相机栈的部署与延迟预算 | ○ | ○ |
+| 4.12 | 安全与验证(模板实例) | ○ | ○ |
+
+## 延伸阅读
+- _见 [[reading_list]] 第 4 章相关条目(YOLO 各版本发布说明、DETR / Deformable / DINO / RT-DETR / DEIM / D-FINE / FCOS / CenterNet / GroundingDINO / ByteTrack / Mask2Former / MapTR / FCOS3D / BEVFormer / PETR / DINOv2 / SAM)_。
+
+## 相关链接
+- ⬅ 上一章: [[3_0_overview_ZH]]
+- ➡ 下一章: [[5_0_overview_ZH]]
+- 🌐 其他语言版本: [[4_0_overview_EN]]
+- 🗂 目录总表: [[00_table_of_contents]]
