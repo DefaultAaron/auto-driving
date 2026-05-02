@@ -137,9 +137,19 @@ Plus: pedagogical clarity, accuracy, depth match, handoff fidelity, scope creep.
 
 **Codex-drafted sections also run against the codex-bias checklist** (§5 Rule 3c) in main session's critique: markdown over-listing, analogy register defaults, foundational example choices, depth-of-explanation defaults.
 
-Revisions are made by re-dispatching the original writer (cc-writer or codex-writer) with the critique notes. The writer edits the same file in place (or in the worktree, for codex-writer), and updates frontmatter to `workflow_status: reviewing` after the first revision. Main session may also edit directly when the change is minor (typos, frontmatter, single-sentence rewrites).
+Revisions are made by **re-dispatching the original writer** (cc-writer or codex-writer) with the critique notes — this is the default, not an option. The writer edits the same file in place (or in the worktree, for codex-writer), and updates frontmatter to `workflow_status: reviewing` after the first revision. The writer dispatch is wrapped with a one-section revision sentinel (same `.claude/active_writer_batch.json` shape as a Phase-4 batch sentinel, but listing only the single section path) so the path-scope hook still gates the write.
 
-Convergence: AGREED / STILL DISAGREEING. On AGREED, frontmatter stays at `workflow_status: reviewing` until the chapter voice pass.
+Main session may edit directly only in three narrow cases. Each case is **exceptional and auditable**, not a fourth normal revision path:
+
+| Case | Examples | Commit-message tag (mandatory) |
+|---|---|---|
+| **minor** | Typos, frontmatter, single-sentence rewrites, wikilink slug fixes | `main-direct: minor — <one-line>` |
+| **adjudication** | Main is *resolving* a critique by deciding between competing options codex raised, not just applying it | `main-direct: adjudication — <one-line>` |
+| **writer-overhead** | Re-dispatching the writer would cost more than the edit (typically 1–3 lines, mechanical, no judgment). **Use rarely.** Repeated `writer-overhead` tags in one chapter are an audit smell. | `main-direct: writer-overhead — <one-line>` |
+
+Any non-minor direct edit without one of these tags in the WIP commit message is a workflow violation. The default path is writer re-dispatch.
+
+Convergence: codex ends each turn with `AGREED:` or `STILL DISAGREEING:`. **Main session may also push back** when a critique is wrong, off-target, or out of scope — see the `CONTESTED:` protocol in §8. On final AGREED, frontmatter stays at `workflow_status: reviewing` until the chapter voice pass.
 
 ### Phase 6 — Chapter voice pass (terminal)
 
@@ -183,9 +193,11 @@ There is no live quota API. The ratio is heuristic and best-effort. Codex CONFLI
 
 **Rule 3a — allocation skew.** When ratio is tied or close, cc-writer drafts sections with the most novel / contested / theoretically-loaded content. Codex-writer drafts sections that are largely well-known applied content (established architectures, ROS2 / TensorRT boilerplate, standard pipeline writeups). The Phase 3 plan must record the assignment rationale per section.
 
-**Rule 3b — mandatory factual spot-check on codex-drafted sections.** In Phase 5, for any codex-written section, main session selects 2–3 factual claims, dispatches `gemini-researcher` for verification on those claims, and only proceeds toward AGREED after verification. cc-written sections do not require this — intra-Claude critique handles them — though main session may invoke gemini ad-hoc when a claim feels fragile.
+**Rule 3b — factual spot-check on codex-drafted sections, risk-based rerun.** In Phase 5, for any codex-written section round-1 draft, main session selects 2–3 factual claims, dispatches `gemini-researcher` for verification on those claims, and only proceeds toward AGREED after verification. cc-written sections do not require this — intra-Claude critique handles them — though main session may invoke gemini ad-hoc when a claim feels fragile. **Rerun condition:** Rule 3b reruns on subsequent rounds **only if a codex-writer revision adds or materially changes factual claims**. Rule 3b does *not* rerun automatically per AGREED milestone — that would be process cost without proportional risk reduction (gemini verifies factual claims, not editorial framing).
 
-**Rule 3c — codex-bias checklist in Phase 5.** Main session runs codex-drafted sections against an explicit checklist before AGREED: markdown over-listing, analogy register, foundational example choice, depth-of-explanation defaults. Main session owns this; codex CONFLICT is informed but not arbiter.
+**Rule 3c — codex-bias checklist applied per substantial codex-writer revision.** Main session runs codex-drafted sections against an explicit checklist: markdown over-listing, analogy register defaults, foundational example choices, depth-of-explanation defaults. The check applies **after every substantial codex-writer revision** (not only before final Phase-5 AGREED), because each codex-writer pass risks reintroducing the same editorial defaults. Main records a short bias-check result before the next codex CONFLICT call on that section. Main session owns this; codex CONFLICT is informed but not arbiter.
+
+**Rule 3d — late-round same-model break.** If a codex-drafted section reaches **round 4 or beyond** of the Phase-5 deal-loop and the remaining disagreement is about pedagogy, framing, analogy, or depth (not facts), main session must take one of two paths: (a) explicitly **CONTEST** the critique under §8's `CONTESTED:` protocol with a documented rationale category, or (b) dispatch a **targeted cc-writer fresh-eye revision** on the disputed passage only. The cc-writer dispatch carries a tightly-scoped brief ("revise the following N paragraphs against codex's round-N critique with the chapter plan as rubric") and writes through a one-section revision sentinel. This is the editorial-bias break that Rule 3c alone cannot provide once codex-writer is also doing the revisions.
 
 ## 6. Path scoping and safety
 
@@ -273,7 +285,7 @@ Filter examples:
 
 User-edit collisions are eliminated by §6.1 (clean-state precondition).
 
-## 8. Convergence protocol (preserved)
+## 8. Convergence protocol (bidirectional)
 
 Every `codex-collaborator` CONFLICT-mode response ends with exactly one of:
 - `STILL DISAGREEING: <one-line>` — main session dispatches round N+1 with `RESUME: true`.
@@ -282,6 +294,29 @@ Every `codex-collaborator` CONFLICT-mode response ends with exactly one of:
 Trivial / docs-only / single-sentence edits skip the deal-loop entirely.
 
 This protocol applies in Phase 2 (research), Phase 3 (plan + allocation), Phase 5 (per-section drafts), and Phase 6 (chapter voice pass). Phase 1 (parallel research) and Phase 4 (parallel drafting) are not adversarial.
+
+### 8.1 `CONTESTED:` — main session pushback
+
+Codex's marker is one half of the convergence. **Main session may push back when a critique is wrong, off-target, or out of scope.** The default is implicit: if main applies the critique fully, no main-side marker is required beyond the normal WIP commit summary. When main does **not** fully apply a substantive critique, main ends the revision turn with:
+
+```
+CONTESTED: <critique-id-or-summary> — <rationale-category>: <one-line argument>
+```
+
+Allowed rationale categories (closed list — choose the one that fits, do not invent new ones):
+
+| Category | Use when |
+|---|---|
+| `already-satisfied` | The critique describes a problem the draft already addresses; main argues codex misread the section. |
+| `technically-wrong` | The critique's technical claim is incorrect (with evidence). |
+| `pedagogically-worse` | Following the critique would degrade explanation, not improve it. |
+| `out-of-scope` | The critique points at material owned by another section / chapter; not §X.Y's job. |
+| `over-budget` | The critique would push length, depth, or scope past the chapter plan's bound for this section. |
+| `chapter-context` | The critique is locally reasonable but conflicts with a binding chapter-level decision (style anchor, terminology contract, prerequisite chain). |
+
+Codex's next CONFLICT round must answer the contested rationale **before** introducing new objections. A `CONTESTED:` does not terminate the loop; the convergence rule remains "both sides AGREED." Codex either concedes (returns `AGREED:`) or sharpens its objection (returns `STILL DISAGREEING:` with revised reasoning that addresses main's argument).
+
+`CONTESTED:` items are logged in WIP commit messages **only when they materially affect the section**, not for tiny wording choices. Repeated `CONTESTED:` entries from main on the same section across multiple rounds are an audit smell — main is either right (and codex should converge) or stalling (and should accept the critique).
 
 ## 9. Modification discipline (preserved)
 

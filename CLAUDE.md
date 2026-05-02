@@ -58,10 +58,10 @@ The vault uses a five-actor team and a six-phase per-chapter pipeline. Verbose a
 2. **Research deal-loop** — main + codex CONFLICT iterate; codex may *propose* structural changes (proposed-not-adopted; user approves before lockstep update).
 3. **Chapter plan + allocation deal-loop** — main drafts an 11-item plan (sections, DAG, batches, writer assignments, handoff snippets, style anchor, prerequisite chain, TOC slice, must-preserve terminology, reader assumptions, downstream commitments); codex CONFLICT reviews all 11 items including DAG correctness and ratio appropriateness.
 4. **Per-section drafting** (parallel where independent) — main builds section briefs, enforces full-repo `git status --porcelain` clean precondition, writes the batch sentinel listing assigned paths, dispatches cc-writer / codex-writer per the 1:1 dynamic ratio, copies codex-writer outputs back from the worktree, runs structured post-batch validation, removes the sentinel.
-5. **Per-section deal-loop** — main + codex CONFLICT iterate on the draft (framing + terminology + surface voice + handoff fidelity + scope creep); codex-drafted sections also require a gemini factual spot-check on 2–3 claims (Rule 3b) and a codex-bias checklist pass (Rule 3c).
+5. **Per-section deal-loop** — main + codex CONFLICT iterate on the draft (framing + terminology + surface voice + handoff fidelity + scope creep). **Revisions default to re-dispatching the original writer** (cc-writer or codex-writer) wrapped in a one-section revision sentinel; main edits directly only for `minor` / `adjudication` / `writer-overhead` cases, each tagged in the WIP commit. Codex-drafted sections also require a gemini factual spot-check on 2–3 claims (Rule 3b — rerun only on factual changes) and a codex-bias checklist pass after every substantial codex-writer revision (Rule 3c). Round 4+ codex-drafted disagreements about pedagogy/framing must either be CONTESTED or routed to a cc-writer fresh-eye revision (Rule 3d).
 6. **Chapter voice pass (terminal)** — main + codex harmonize **surface concerns only** (transitions, pacing, redundancy, terminology drift). No structural rewrites at Phase 6 — kicks back to Phase 5. On AGREED, main sets every section's `workflow_status: complete` and commits.
 
-**Convergence protocol** — every CONFLICT-mode response from codex ends with `STILL DISAGREEING: <one-line>` (loop continues with `RESUME: true`) or `AGREED: <one-line>` (phase complete). Trivial / docs-only / single-sentence edits skip the deal-loop.
+**Convergence protocol (bidirectional)** — every CONFLICT-mode response from codex ends with `STILL DISAGREEING: <one-line>` (loop continues) or `AGREED: <one-line>` (phase complete). **Main session may also push back** when a critique is wrong, off-target, or out of scope: `CONTESTED: <critique-id> — <rationale-category>: <one-line>` where rationale-category ∈ {`already-satisfied`, `technically-wrong`, `pedagogically-worse`, `out-of-scope`, `over-budget`, `chapter-context`}. Codex's next round must answer the contested rationale before introducing new objections. Convergence requires both sides AGREED. Trivial / docs-only / single-sentence edits skip the deal-loop.
 
 **Section file lifecycle:** one file per section, `chapter_<N>_<slug>/<N>_<M>_<section_slug>_EN.md`. Frontmatter `workflow_status: draft → reviewing → complete` is kept indefinitely (no stripping at completion).
 
@@ -69,8 +69,9 @@ The vault uses a five-actor team and a six-phase per-chapter pipeline. Verbose a
 
 **Same-model bias mitigation (procedural):**
 - Rule 3a — when ratio is tied, cc-writer drafts novel/contested content; codex-writer drafts well-known applied content.
-- Rule 3b — codex-drafted sections require gemini factual spot-check in Phase 5.
-- Rule 3c — codex-drafted sections run against a codex-bias checklist (markdown over-listing, analogy register, foundational example choice, depth defaults).
+- Rule 3b — codex-drafted round-1 sections require gemini factual spot-check; **rerun only when a codex-writer revision adds or materially changes factual claims** (not auto-rerun per AGREED milestone).
+- Rule 3c — codex-bias checklist (markdown over-listing, analogy register, foundational example choice, depth defaults) applies **after every substantial codex-writer revision**, not only at final AGREED.
+- Rule 3d — at round 4+ on a codex-drafted section, if the residual disagreement is editorial (pedagogy / framing / analogy / depth, not facts), main must either explicitly CONTEST the critique or dispatch a **cc-writer fresh-eye revision** on the disputed passage. This is the same-model break Rule 3c alone cannot provide once codex-writer revises.
 
 **Important constraints:**
 - Codex-collaborator is the **sole** conflictor. Do not add Gemini as a second adversary.
