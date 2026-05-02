@@ -3,7 +3,7 @@ chapter: <N>
 section: 0
 title: <Chapter title> — Overview
 language: EN
-status: planned
+workflow_status: planned
 tags:
   - book/section
   - book/chapter-<N>
@@ -13,8 +13,8 @@ tags:
 
 # Chapter <N> — <Chapter title>
 
-> [!info] Status & canonical state
-> Frontmatter `status` is canonical. [[00_table_of_contents|TOC]] badges are a manual display copy.
+> [!info] Workflow status & canonical state
+> Frontmatter `workflow_status` is canonical (`planned` → `draft` → `reviewing` → `complete`). [[00_table_of_contents|TOC]] badges are a manual display copy.
 
 > [!abstract] What this chapter covers
 > Two- to four-sentence summary of the chapter's scope and where it sits in the book's pedagogical arc.
@@ -28,13 +28,13 @@ By the end of this chapter, the reader can:
 - [[<earlier chapter or section wikilink>]]
 
 ## Sections
-| § | Title | Status (EN) | Status (ZH) |
-|---|-------|:-----------:|:-----------:|
+| § | Title | workflow_status (EN) | workflow_status (ZH) |
+|---|-------|:--------------------:|:--------------------:|
 | <N>.0 | Overview (this page) | ● | ● |
 | <N>.1 | _Section title_ | ○ | ○ |
 | <N>.2 | _Section title_ | ○ | ○ |
 
-> Legend: ○ planned · ◐ draft · ● review/done. Re-sync from each section's frontmatter `status`.
+> Legend: ○ planned · ◐ draft · ◑ reviewing · ● complete. Re-sync from each section's frontmatter `workflow_status`.
 
 ## Worked-example reference (optional)
 _If this chapter uses the mingtai traffic-light project as a worked example, name where:_

@@ -40,34 +40,50 @@ A **comprehensive pedagogical guide for mastering autonomous driving** — funda
 
 **When planning or drafting chapters:** follow the canonical pedagogical order above; the user's personal deployment milestones are context, not constraint; use mingtai only where it actually clarifies a concept.
 
-## Subagents and the three-stage workflow
+## Subagents and the per-chapter pipeline
 
-This vault has two project-scoped subagents in `.claude/agents/`:
+The vault uses a five-actor team and a six-phase per-chapter pipeline. Verbose authoritative spec lives at `_workflow/subagents_design.md`; this section is the concise summary.
 
-- **`codex-collaborator`** — dual-mode codex wrapper. `MODE: RESEARCH` produces an independent research stream (used in parallel with the main session and gemini). `MODE: CONFLICT` is the adversarial reviewer for plans and drafts. Pass `RESUME: true` (and the agent appends `--resume-last`) to continue a critique thread across rounds.
-- **`gemini-researcher`** — single-mode research assistant. Used during the research stage only; never for critique or planning.
+**Agent team:**
 
-**Three stages**, applied to any non-trivial book content:
+- **Main session** — Claude Code (this CLI). Orchestrator and sole authority for `CLAUDE.md`, `README.md`, memory, TOC, chapter overviews, and final commits.
+- **`codex-collaborator`** — codex-companion runtime, no `--write`. Dual-mode RESEARCH \| CONFLICT. **Sole conflictor.** Pass `RESUME: true` to continue a critique thread with `--resume-last`.
+- **`gemini-researcher`** — Gemini CLI, `--approval-mode plan`. Research only; never critique, never drafting. Also performs mandatory factual spot-checks for codex-drafted sections (Phase 5 Rule 3b).
+- **`cc-writer`** — Claude Code subagent. Drafts one section file per dispatch into the main repo. Path scope is hard-enforced by the `PreToolUse` hook (`.claude/hooks/check_writer_path_scope.mjs`) reading `.claude/active_writer_batch.json`.
+- **`codex-writer`** — codex-companion runtime, `--write` enabled, `--cwd` set to the sacrificial worktree at `../auto-driving-codex-worktree`. Drafts one section file per dispatch inside the worktree; main session copies the assigned path back to the main repo after the writer returns.
 
-1. **Research** — main session dispatches `gemini-researcher` and `codex-collaborator` (RESEARCH mode) in parallel, runs its own search in parallel, then integrates the three `## Findings / ## Sources / ## Open questions` blocks into a single synthesis. Then enters the conflict-deal loop with codex on what to keep / cut.
-2. **Planning** — main session drafts the plan; conflict-deal loop with codex; finalize.
-3. **Generating** — main session drafts the prose; conflict-deal loop with codex; write the final note(s) to the vault.
+**Per-chapter pipeline (six phases):**
 
-**Convergence protocol** — every CONFLICT-mode response from codex ends with exactly one of:
-- `STILL DISAGREEING: <one-line>` → loop continues, dispatch round N+1 with `RESUME: true`.
-- `AGREED: <one-line>` → deal done, main session writes the deliverable.
+1. **Research** — main + gemini + codex RESEARCH in parallel; main integrates.
+2. **Research deal-loop** — main + codex CONFLICT iterate; codex may *propose* structural changes (proposed-not-adopted; user approves before lockstep update).
+3. **Chapter plan + allocation deal-loop** — main drafts an 11-item plan (sections, DAG, batches, writer assignments, handoff snippets, style anchor, prerequisite chain, TOC slice, must-preserve terminology, reader assumptions, downstream commitments); codex CONFLICT reviews all 11 items including DAG correctness and ratio appropriateness.
+4. **Per-section drafting** (parallel where independent) — main builds section briefs, enforces full-repo `git status --porcelain` clean precondition, writes the batch sentinel listing assigned paths, dispatches cc-writer / codex-writer per the 1:1 dynamic ratio, copies codex-writer outputs back from the worktree, runs structured post-batch validation, removes the sentinel.
+5. **Per-section deal-loop** — main + codex CONFLICT iterate on the draft (framing + terminology + surface voice + handoff fidelity + scope creep); codex-drafted sections also require a gemini factual spot-check on 2–3 claims (Rule 3b) and a codex-bias checklist pass (Rule 3c).
+6. **Chapter voice pass (terminal)** — main + codex harmonize **surface concerns only** (transitions, pacing, redundancy, terminology drift). No structural rewrites at Phase 6 — kicks back to Phase 5. On AGREED, main sets every section's `workflow_status: complete` and commits.
 
-The main session reads this marker programmatically. Trivial / docs-only / single-sentence edits skip the deal loop.
+**Convergence protocol** — every CONFLICT-mode response from codex ends with `STILL DISAGREEING: <one-line>` (loop continues with `RESUME: true`) or `AGREED: <one-line>` (phase complete). Trivial / docs-only / single-sentence edits skip the deal-loop.
+
+**Section file lifecycle:** one file per section, `chapter_<N>_<slug>/<N>_<M>_<section_slug>_EN.md`. Frontmatter `workflow_status: draft → reviewing → complete` is kept indefinitely (no stripping at completion).
+
+**Git commit strategy (Strategy C+):** WIP commits on every writer return AND milestone commits at every AGREED gate. Default no squash. Six-prefix taxonomy: `wip / revert / agreed / plan / chapter / lockstep`. See spec §7 for examples.
+
+**Same-model bias mitigation (procedural):**
+- Rule 3a — when ratio is tied, cc-writer drafts novel/contested content; codex-writer drafts well-known applied content.
+- Rule 3b — codex-drafted sections require gemini factual spot-check in Phase 5.
+- Rule 3c — codex-drafted sections run against a codex-bias checklist (markdown over-listing, analogy register, foundational example choice, depth defaults).
 
 **Important constraints:**
-- Codex is the **sole** conflictor. Do not add Gemini as a second adversary — the deal loop is single-counterparty by design.
-- Both subagents are read-only (codex never gets `--write`; gemini runs in `--approval-mode plan`).
-- Project-scoped subagents are loaded at session start. After editing files in `.claude/agents/`, the user must restart the Claude Code session for changes to take effect.
+- Codex-collaborator is the **sole** conflictor. Do not add Gemini as a second adversary.
+- `codex-collaborator` is read-only (no `--write`); `gemini-researcher` runs in `--approval-mode plan`. Only `codex-writer` runs Codex with `--write`, and only inside the sacrificial worktree.
+- Project-scoped subagents are loaded at session start. After editing `.claude/agents/` or `.claude/settings.json`, the user must restart the Claude Code session.
+- The full-repo `git status --porcelain` clean-state precondition (§6.1 of the spec) means the user must commit/stash any in-progress edits across the entire vault before main session can dispatch a writer batch.
 
 **Modification discipline (load-bearing — see `feedback_workflow_discipline.md` + `feedback_update_in_lockstep.md` in project memory):**
-- **Never apply a modification before codex `AGREED`.** Even direct user instructions that change the agreed plan go through the deal loop first.
+- **Never apply a modification before codex `AGREED`.** Even direct user instructions that change the agreed plan go through the deal loop first. The rule applies to workflow / meta-architecture changes, not just book content.
 - **Never act on downstream artifacts before the user explicitly approves the plan.** "Give me the plan" means present-then-wait, not implement.
-- **When you do change anything substantive, update memory + CLAUDE.md + README + TOC + affected chapter overviews together** so the four sources never drift. Memory and CLAUDE.md stay concise; README is the verbose authoritative plan.
+- **When you do change anything substantive, update memory + CLAUDE.md + README + TOC + affected chapter overviews together** so the four sources never drift. Memory and CLAUDE.md stay concise; README is the verbose authoritative plan; `_workflow/subagents_design.md` is the verbose authoritative workflow spec.
+
+A `UserPromptSubmit` hook at `.claude/hooks/codex_conflict_reminder.sh` injects a reminder of this discipline on every prompt. The hook is a reminder, not enforcement — the discipline still lives in the rule above.
 
 ## Working in the vault
 

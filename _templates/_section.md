@@ -3,7 +3,7 @@ chapter: <N>
 section: <M>
 title: <Section title>
 language: EN
-status: planned
+workflow_status: planned
 tags:
   - book/section
   - book/chapter-<N>
@@ -12,9 +12,10 @@ tags:
 
 # <Chapter N>.<M> — <Section title>
 
-> [!info] Status & canonical state
-> The frontmatter `status` field above is the **canonical** progress indicator for this file (`planned` → `draft` → `review` → `done`).
-> The status badges in [[00_table_of_contents|the table of contents]] are a **manual display copy** — re-sync them when you change `status` here.
+> [!info] Workflow status & canonical state
+> The frontmatter `workflow_status` field above is the **canonical** progress indicator for this file (`planned` → `draft` → `reviewing` → `complete`).
+> `planned` is the manual-scaffold starting state. The writer pipeline (cc-writer / codex-writer) sets `draft` on first write, `reviewing` after deal-loop revisions, and `complete` after the chapter voice pass.
+> The status badges in [[00_table_of_contents|the table of contents]] are a **manual display copy** — re-sync them when you change `workflow_status` here.
 
 > [!abstract] Summary
 > One-paragraph summary of what this section covers and why it matters.

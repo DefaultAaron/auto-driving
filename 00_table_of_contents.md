@@ -8,8 +8,8 @@ tags:
 
 > [!info] How this TOC works
 > - **Section-level checkbox** `[ ]` is the user's progress tracker. It is **language-agnostic** — tick it only when *both* the EN and ZH versions of a section are written and reviewed.
-> - **Per-language status badges** ( ○ ◐ ● ) next to each language wikilink are a **manual display copy** of each file's frontmatter `status` field — frontmatter is canonical. Re-sync the badges when a file's status changes.
-> - **Legend:** ○ planned · ◐ draft · ● review/done.
+> - **Per-language workflow_status badges** ( ○ ◐ ◑ ● ) next to each language wikilink are a **manual display copy** of each file's frontmatter `workflow_status` field — frontmatter is canonical. Re-sync the badges when a file's workflow_status changes. (Legacy chapter overview files still use `status:` until they're rewritten through the writer pipeline; new/updated section files use `workflow_status:`.)
+> - **Legend:** ○ planned · ◐ draft · ◑ reviewing · ● complete.
 
 > [!tip] Conventions
 > - Filenames: `N_M_short_slug_LANG.md` where `N` = chapter, `M` = section (0 = chapter overview), `LANG` ∈ `{EN, ZH}`.

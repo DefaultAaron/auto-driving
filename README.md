@@ -48,12 +48,12 @@ Folders prefixed with `_` are support, not content.
 
 ## 3. Bilingual progress tracking
 
-**Frontmatter is canonical.** Every section file declares `status`: `planned` → `draft` → `review` → `done`.
+**Frontmatter is canonical.** Every section file declares `workflow_status`: `planned` → `draft` → `reviewing` → `complete`. The legacy `status` field is deprecated; new and updated section files use `workflow_status`.
 
 **TOC display is a manual copy.** [[00_table_of_contents]] shows:
-- One **section-level checkbox** `[ ]` per section, language-agnostic. Tick only when both `_EN` + `_ZH` reach `status: done`.
-- Two **per-language status badges** ( ○ ◐ ● ) beside each language wikilink, mirroring frontmatter.
-- **Legend:** `○` planned · `◐` draft · `●` review/done.
+- One **section-level checkbox** `[ ]` per section, language-agnostic. Tick only when both `_EN` + `_ZH` reach `workflow_status: complete`.
+- Two **per-language workflow_status badges** ( ○ ◐ ◑ ● ) beside each language wikilink, mirroring frontmatter.
+- **Legend:** `○` planned · `◐` draft · `◑` reviewing · `●` complete.
 
 Re-sync badges manually when frontmatter changes.
 
@@ -96,7 +96,7 @@ In `_templates/` (point the Obsidian Templates plugin's folder here):
 
 - **Wikilinks** `[[...]]` for internal references; **embeds** `![[...]]` for figures and externalised code.
 - **Callouts** for highlights: `> [!info]` (status / metadata), `> [!abstract]` (chapter / section summary), `> [!warning]` (open questions, gotchas), `> [!example]` (code blocks), `> [!tip]` (operational guidance).
-- **Frontmatter** for `chapter`, `section`, `title`, `language`, `status`, `tags`.
+- **Frontmatter** for `chapter`, `section`, `title`, `language`, `workflow_status`, `tags`.
 - **Tags**: `book/section`, `book/chapter-<N>`, `book/overview`, `book/toc`, `book/reading-list`, `lang/EN`, `lang/ZH`, `region/cn` / `region/us` / `region/eu` (reading-list industry context).
 - **Templates** core plugin → `_templates/`.
 - **Bases** (deferred) — for reading-list filtering and section-status views.
@@ -139,18 +139,83 @@ Full section list lives in [[00_table_of_contents]]. Per-chapter overview pages 
 
 ---
 
-## 9. Workflow conventions
+## 9. Workflow conventions — five-actor team, six-phase pipeline
 
-This vault uses a project-scoped three-stage workflow (defined in `CLAUDE.md`):
+The vault uses a five-actor team and a six-phase per-chapter pipeline. The verbose authoritative spec is `_workflow/subagents_design.md`. `CLAUDE.md` carries the concise summary. This section gives the full overview a new collaborator (or Claude session) needs to operate the workflow.
 
-1. **Research** — main session dispatches `gemini-researcher` and `codex-collaborator` (`MODE: RESEARCH`) in parallel, integrates streams.
-2. **Planning** — main session drafts the plan; deal-loop with `codex-collaborator` (`MODE: CONFLICT`) until `AGREED`.
-3. **Generating** — main session drafts the prose; deal-loop with codex; write final notes.
+### 9.1 The five actors
 
-Codex is the **sole** conflictor; Gemini is research-only. Trivial / docs-only / single-sentence edits skip the deal loop.
+| Role | Runtime | Writes to vault? | Modes |
+|---|---|---|---|
+| Main session | Claude Code (this CLI) | yes — sole authority for `CLAUDE.md`, `README.md`, memory, TOC, chapter overviews, final commits | orchestrator |
+| `codex-collaborator` | codex-companion runtime, no `--write` | no | RESEARCH \| CONFLICT (sole conflictor) |
+| `gemini-researcher` | Gemini CLI, `--approval-mode plan` | no | RESEARCH only + factual spot-check |
+| `cc-writer` | Claude Code subagent | yes — only the batch-assigned section path, hook-enforced | WRITER only |
+| `codex-writer` | codex-companion runtime, `--write`, `--cwd` to sacrificial worktree | only the assigned section path is copied back to main repo | WRITER only |
 
-> [!warning] Modification discipline
-> **Never apply a modification before codex `AGREED`.** **Never act on downstream artifacts before the user explicitly approves the plan.** "Give me the plan" means present-then-wait. **When you do change anything substantive, update memory + CLAUDE.md + the affected vault content together** so the four sources stay in sync. See `feedback_workflow_discipline.md` and `feedback_update_in_lockstep.md` in the project memory.
+### 9.2 The six phases (per chapter)
+
+1. **Research** — main session, `gemini-researcher`, and `codex-collaborator` (`MODE: RESEARCH`) run in parallel; main session integrates the three `## Findings / ## Sources / ## Open questions` streams into a synthesis.
+2. **Research deal-loop** — main + `codex-collaborator` (`MODE: CONFLICT`, `RESUME: true` across rounds) iterate on what to keep/cut and on any structural proposals codex raises (new section, reorder, additions beyond the canonical 13-chapter plan). Structural changes are *proposed-not-adopted*: they require explicit user approval and a lockstep update across memory + CLAUDE.md + README + TOC + chapter overviews before drafting begins.
+3. **Chapter plan + allocation deal-loop** — main session drafts an 11-item plan: section list (scope-in/out, depth, length band) · section dependency DAG · parallel batch groups · writer assignments (cc/codex per section, with rationale) · handoff snippets · style anchor reference · prerequisite chain · canonical TOC slice · must-preserve terminology list · reader knowledge assumptions · downstream commitments. Codex CONFLICT reviews all 11 items.
+4. **Per-section drafting (parallel where independent)** — main session enforces a full-repo `git status --porcelain` clean precondition, writes the batch sentinel (`.claude/active_writer_batch.json`) listing assigned paths, dispatches all writers in the batch in a single message (parallel `Agent` tool calls), copies codex-writer outputs back from the worktree, runs structured post-batch validation, removes the sentinel.
+5. **Per-section deal-loop** — main + codex CONFLICT iterate on the draft (framing + terminology + surface voice + handoff fidelity + scope creep). For codex-drafted sections, main also dispatches `gemini-researcher` for a factual spot-check on 2–3 claims (Rule 3b) and runs the codex-bias checklist (Rule 3c).
+6. **Chapter voice pass (terminal)** — main + codex harmonize **surface concerns only**: cross-section transitions, pacing, redundancy, surface-voice smoothing, terminology drift catch. **No structural rewrites at Phase 6** — if a section needs structural rework, it goes back to Phase 5. On AGREED, main session sets every section's `workflow_status: complete` and commits the chapter with TOC + chapter-overview lockstep updates bundled in.
+
+### 9.3 Section file lifecycle
+
+One file per section: `chapter_<N>_<slug>/<N>_<M>_<section_slug>_EN.md` (and `_ZH.md` per the bilingual convention).
+
+Frontmatter `workflow_status` field:
+- `draft` — writer just produced first version, not yet critiqued
+- `reviewing` — one or more deal-loop revisions applied
+- `complete` — chapter voice pass AGREED, section published
+
+The field is kept indefinitely (no stripping). If an export pipeline is added later, that pipeline strips at export time.
+
+### 9.4 Allocation ratio and same-model bias mitigation
+
+**Default ratio**: 1:1 cc-writer : codex-writer. Main session adjusts dynamically per chapter using context-size pressure on the main session (proxy for Claude quota stress), recent codex usage, chapter character (theory-heavy → cc bias; applied/code-heavy → codex bias), and explicit user override. Codex CONFLICT can challenge the chosen ratio in Phase 3.
+
+**Procedural bias mitigation:**
+- **Rule 3a — allocation skew.** When ratio is tied, cc-writer drafts novel/contested/theoretically-loaded sections; codex-writer drafts well-known applied sections.
+- **Rule 3b — gemini factual spot-check on codex-drafted sections.** Main selects 2–3 claims, dispatches gemini, only proceeds toward AGREED after verification.
+- **Rule 3c — codex-bias checklist.** Main runs codex-drafted sections against an explicit checklist before AGREED (markdown over-listing, analogy register, foundational example choice, depth defaults).
+
+### 9.5 Path scoping and safety
+
+Four-layer model (full detail in `_workflow/subagents_design.md` §6):
+
+1. **Full-repo clean-state precondition** — main session aborts a writer batch if `git status --porcelain` is non-empty anywhere in the repo. User must commit/stash before drafting.
+2. **cc-writer hard guard via PreToolUse hook** — `.claude/hooks/check_writer_path_scope.mjs` reads `.claude/active_writer_batch.json` and blocks Write/Edit calls outside the batch's assigned-paths allowlist. Permissive when no sentinel exists.
+3. **codex-writer hard isolation** — `git worktree add ../auto-driving-codex-worktree codex-writer-isolated` creates a sacrificial worktree. Codex always runs with `--cwd <worktree>`. Only the assigned section path is copied back to main. The worktree's `reset --hard` is destructive *only inside the worktree*, never main.
+4. **Structured post-batch validation** — main computes the change set against the batch sentinel and reverts out-of-scope events file-by-file (never blanket `git restore .`).
+
+### 9.6 Git commit strategy — Strategy C+
+
+WIP commits on every writer return AND milestone commits at every AGREED gate. Default no squash. Six-prefix taxonomy:
+
+| Prefix | When |
+|---|---|
+| `wip(<chapter>/<section>)` | Every writer return |
+| `revert(<chapter>/<section>)` | Post-batch validation reverts an out-of-scope edit |
+| `agreed(<chapter>/<section>)` | Phase 5 AGREED on a section |
+| `plan(<chapter>)` | Phase 2 or 3 AGREED |
+| `chapter(<N>)` | Phase 6 AGREED, chapter published |
+| `lockstep(<topic>)` | Multi-artifact lockstep update |
+
+Filter examples: `git log --grep '^chapter('` (milestones); `git log --grep '^wip(' --grep '^revert(' -E` (drafting trail).
+
+### 9.7 Convergence protocol
+
+Every `codex-collaborator` CONFLICT-mode response ends with exactly one of:
+- `STILL DISAGREEING: <one-line>` → main dispatches round N+1 with `RESUME: true`.
+- `AGREED: <one-line>` → phase complete, main proceeds.
+
+Trivial / docs-only / single-sentence edits skip the deal-loop entirely.
+
+> [!warning] Modification discipline (load-bearing)
+> **Never apply a modification before codex `AGREED`** at the relevant phase, including for workflow / meta-architecture changes — not just book content. **Never act on downstream artifacts before the user explicitly approves the plan.** "Give me the plan" means present-then-wait. **When you change anything substantive, update memory + CLAUDE.md + README + TOC + affected chapter overviews together.** See `feedback_workflow_discipline.md` and `feedback_update_in_lockstep.md` in project memory. A `UserPromptSubmit` hook at `.claude/hooks/codex_conflict_reminder.sh` reinforces the rule on every prompt.
 
 ---
 
@@ -169,13 +234,25 @@ Items the scaffold deliberately leaves to the user; resolve before writing the a
 
 ## 11. How to add a new section
 
-1. Decide chapter and section number `N.M`.
-2. Create both `chapter_N_*/N_M_<slug>_EN.md` and `..._ZH.md` from `_templates/_section.md`.
-3. Set frontmatter (`chapter`, `section`, `title`, `language`, `status: planned`, `tags`).
-4. Add a row to the parent chapter overview's sections table (badges = `○`).
-5. Add a row to [[00_table_of_contents]] under the chapter, with checkbox + both language wikilinks.
-6. Draft → set `status: draft` (badge `◐`) → review/done (badge `●`). Re-sync badges manually.
-7. Tick the master TOC checkbox only when both `_EN` and `_ZH` reach `done`.
+Two paths: writer-pipeline drafting (the default for sections drafted via cc-writer / codex-writer) or manual scaffolding (when you want to seed an empty section file before drafting).
+
+**Writer pipeline (preferred):**
+
+1. Decide chapter `N` and section number `N_M`.
+2. Add the section to the Phase 3 chapter plan (scope, depth, length band, dependency edges, writer assignment per the 1:1 dynamic ratio, handoff snippet if dependent).
+3. After Phase 3 AGREED, the writer subagent creates the file at `chapter_N_*/N_M_<slug>_EN.md` with frontmatter `workflow_status: draft` plus the brief-required fields (`chapter`, `section`, `title`, `language`, `tags`). The writer never creates the `_ZH.md` — bilingual translation is a separate post-completion phase.
+4. Phase 5 deal-loop revisions flip the file to `workflow_status: reviewing`.
+5. Phase 6 voice pass AGREED → `workflow_status: complete`. Field is **kept** on the file indefinitely (no stripping).
+6. The chapter overview's sections table and `00_table_of_contents.md` row are updated by main session as part of the Phase 6 commit (lockstep) — not by the writer.
+
+**Manual scaffold (when you want a stub before drafting):**
+
+1. Create `chapter_N_*/N_M_<slug>_EN.md` (and optionally `..._ZH.md`) from `_templates/_section.md`.
+2. Set frontmatter with `workflow_status: planned` plus the standard fields.
+3. Add the row to the chapter overview and TOC manually.
+4. When the section enters the writer pipeline, the writer overwrites the stub and flips `workflow_status` to `draft`.
+
+The legacy `status` field is deprecated; new and updated section files use `workflow_status`.
 
 ---
 
