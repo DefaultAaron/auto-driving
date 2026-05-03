@@ -187,7 +187,7 @@ The original 3-batch plan hid a serial dependency (§5.10 ← §5.9 ← §5.7). 
 - **Vocabulary:** book-canonical terminology from Item 9 below. No drift to synonyms even when adversarial review tempts it.
 - **Code policy:** C++ for shippable perception; Python / `numpy` ≤ ~10 lines as compact explanatory pseudocode only. No long Python implementations. Long examples move to `_assets/code/5_M_<slug>.{cpp,py}` and embed via `![[...]]`. (The mingtai project is a traffic-light camera example for Ch 4; not relevant to Ch 5 LiDAR sections.)
 - **Callouts:** `> [!info]` for status / metadata, `> [!abstract]` for section summary, `> [!warning]` for failure modes / open issues, `> [!example]` for code, `> [!tip]` for operational guidance.
-- **Wikilinks:** `[[N_M_slug_EN|Ch N §N.M]]` for cross-references; embeds `![[...]]` for figures and externalized code.
+- **Wikilinks:** cross-chapter references display as `[[N_M_slug_EN|Ch N §N.M]]`; intra-chapter references may display as `[[N_M_slug_EN|§N.M]]` because the chapter context is implicit (refined at Phase 6 round 1; see `_workflow/briefs/ch5_phase6_voice_pass_brief.md`). Embeds `![[...]]` for figures and externalized code.
 - **No emojis** (default vault rule); no marketing-style adjectives ("revolutionary," "state-of-the-art").
 - **Failure-mode pedagogy is mandatory** — every algorithm section ends with at least one failure-mode subsection / callout. mAP-only validation is explicitly insufficient.
 - **Honest assessment over enthusiasm** — when a classical method has been displaced by DL for primary use, say so plainly and explain what classical role survives.
