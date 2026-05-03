@@ -3,7 +3,7 @@ chapter: 5
 section: 7
 title: Occupancy, free-space & map-aided ROI gating
 language: EN
-workflow_status: complete
+workflow_status: reviewing
 tags:
   - book/section
   - book/chapter-5
