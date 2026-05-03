@@ -81,27 +81,27 @@ Zhang's paper gives three scoring criteria. The **area criterion** minimizes:
 J_area(θ) = l(θ) · w(θ)
 ```
 
-This is attractive for compactness but behaves like min-area rectangle when the visible points are only a partial footprint. The **closeness criterion** asks every point to sit near at least one rectangle edge:
+This is compact but behaves like min-area rectangle on partial footprints. The **closeness criterion** asks points to sit near the closer of the two hypothesized L-shape edges:
 
 ```text
-d_i(θ) = min(
-    |u_i - u_min|, |u_i - u_max|,
-    |v_i - v_min|, |v_i - v_max|
-)
-J_close(θ) = Σ_i d_i(θ)
+d_i(θ) = min(distance from point i to first L-edge,
+             distance from point i to second L-edge)
+C(θ) = Σ_i 1 / max(d_i(θ), d_0)   (maximize)
 ```
 
-Some implementations maximize `-J_close` or a reciprocal score; the decision is the same. The **variance criterion** first assigns each point to the closest edge and then measures how evenly the edge residuals behave:
+Here `d_0` prevents division by zero and caps near-perfect alignments. This is not equivalent to minimizing `Σ_i d_i`: the reciprocal is applied before summation, so the argmax rewards inliers and suppresses outliers, while an L1 sum stays outlier-sensitive. The **variance criterion** assigns each point to one of the same two L-shape edges and measures residual evenness:
 
 ```text
-E_j(θ) = { i : edge j is the nearest edge for point i }
-μ_j = mean_{i ∈ E_j} d_i
-J_var(θ) = Σ_{j=1..4} Σ_{i ∈ E_j} (d_i - μ_j)^2
+E1(θ) = { i : point i closer to first L-edge }
+E2(θ) = { i : point i closer to second L-edge }
+σ²_1(θ) = variance of d_i for i ∈ E1
+σ²_2(θ) = variance of d_i for i ∈ E2
+J_var(θ) = σ²_1(θ) + σ²_2(θ)   (minimize)
 ```
 
-Closeness is the common pedagogical default for vehicles because it directly rewards the "visible L lies on the box's two faces" intuition. Area is useful as a compactness tie-breaker; variance is useful when one edge has a few noisy points and another edge is clean. Autoware's `autoware_shape_estimation` is a publicly available implementation in this family.
+Closeness is the common pedagogical default for vehicles because it rewards the "visible L lies on the box's two faces" intuition. Area is a compactness tie-breaker; variance helps when one edge is noisy and another is clean. Production implementations tweak these for latency: `d_0` varies with sensor resolution, and some pipelines use only closeness because variance is heavier. Autoware's `autoware_shape_estimation` is a public implementation in this family.
 
-The search is cheap enough to keep explicit. A production-readable version runs a coarse pass over `θ = 0°, 5°, 10° ... 85°`, keeps the best few candidates under `J_close` (or the configured criterion), and then refines each survivor in a narrow window at `0.5°` or `1°`. With `N` cluster points and `K` tested yaws, the fit is `O(N · K)`: no KD-tree, no iterative optimizer, and no sensitivity to initial yaw. Once `θ*` is chosen, `l` and `w` come from the projection extents; `z` and `h` come from vertical min/max over the original cluster; the optional class remains `unknown` unless an upstream cue or class-prior branch sets it.
+The search is cheap enough to keep explicit. A production-readable version runs a coarse pass over `θ = 0°, 5°, 10° ... 85°`, keeps the best few candidates under `C(θ)` (or the configured criterion), and then refines each survivor in a narrow window at `0.5°` or `1°`. With `N` cluster points and `K` tested yaws, the fit is `O(N · K)`: no KD-tree, no iterative optimizer, and no sensitivity to initial yaw. Once `θ*` is chosen, `l` and `w` come from the projection extents; `z` and `h` come from vertical min/max over the original cluster; the optional class remains `unknown` unless an upstream cue or class-prior branch sets it.
 
 This section uses the following local `yaw_confidence` mapping. Compute five normalized signals: `m`, the score margin between the best and second-best yaw after converting cost to a higher-is-better score; `a`, two-arm support, measured as `min(n_u_edge, n_v_edge) / max(n_u_edge, n_v_edge)` after assigning points to the two populated perpendicular edges; `q`, corner-angle quality, `1 - |angle_between_arms - 90°| / 45°` clamped to `[0, 1]`; `ρ`, point-density support, rising from `0` below the range-aware point floor to `1` at the expected point count; and `r`, a fallback PCA separation term `(λ₁ - λ₂) / (λ₁ + λ₂)` clamped to `[0, 1]`. For L-shape fits:
 
@@ -116,20 +116,20 @@ The exact coefficients are a local implementation contract, not a universal stan
 
 ### Worked Example
 
-Take a toy 12-point L-cluster in meters:
+Take a toy 12-point L-cluster in meters. The local `u` axis is heading, so `l` is longitudinal length; `v` is perpendicular to heading, so `w` is width. This rear-corner partial view shows `2.5 m` longitudinally and `1.5 m` laterally; class-prior back-fill will recover a sedan-like full box near `4.5 m × 1.8 m`.
 
 | point | coordinate | point | coordinate |
 |---|---:|---|---:|
-| `p0` | `(0.0, 0.0)` | `p6` | `(0.0, 0.6)` |
-| `p1` | `(0.7, 0.0)` | `p7` | `(0.0, 1.2)` |
-| `p2` | `(1.4, 0.0)` | `p8` | `(0.0, 1.8)` |
-| `p3` | `(2.1, 0.0)` | `p9` | `(0.0, 2.4)` |
-| `p4` | `(2.8, 0.0)` | `p10` | `(0.0, 3.0)` |
-| `p5` | `(3.5, 0.0)` | `p11` | `(0.0, 3.6)` |
+| `p0` | `(0.0, 0.0)` | `p6` | `(0.0, 0.25)` |
+| `p1` | `(0.5, 0.0)` | `p7` | `(0.0, 0.50)` |
+| `p2` | `(1.0, 0.0)` | `p8` | `(0.0, 0.75)` |
+| `p3` | `(1.5, 0.0)` | `p9` | `(0.0, 1.00)` |
+| `p4` | `(2.0, 0.0)` | `p10` | `(0.0, 1.25)` |
+| `p5` | `(2.5, 0.0)` | `p11` | `(0.0, 1.50)` |
 
-At `θ = 0°`, `u=x`, `v=y`, so `u_min=0`, `u_max=3.5`, `v_min=0`, `v_max=3.6`. Every point lies exactly on `u_min` or `v_min`, so `J_close=0`; the candidate is a perfect L with `l=3.5`, `w=3.6`. At `θ = 5°`, use `cos θ≈0.996`, `sin θ≈0.087`. Point `p5=(3.5,0)` projects to `u≈3.487`, `v≈-0.305`; point `p11=(0,3.6)` projects to `u≈0.314`, `v≈3.586`. The extents become roughly `u_min=0`, `u_max=3.487`, `v_min=-0.305`, `v_max=3.586`.
+At `θ = 0°`, `u=x`, `v=y`, so `u_min=0`, `u_max=2.5`, `v_min=0`, `v_max=1.5`. If the L-edges are `v_min` and `u_min`, every point lies on one of them. With `d_0=0.05 m`, each point contributes `20`, so `C(0°)=240`; the visible extents are `l_visible=2.5 m`, `w_visible=1.5 m`. Because the view undersamples both full length and full width, class-prior update can publish `l≈4.5 m`, `w≈1.8 m`.
 
-Now compute nearest-edge distances for a few points. `p2=(1.4,0)` has `(u,v)≈(1.395,-0.122)`, so its nearest edge is `v_min=-0.305` with distance `0.183`. `p8=(0,1.8)` has `(u,v)≈(0.157,1.793)`, so its nearest edge is `u_min=0` with distance `0.157`. Summing the analogous distances over the 12 points gives a positive `J_close`, so the coarse pass prefers `0°` over `5°`. In real clusters the best yaw is not usually exact; the same arithmetic is what makes `11.5°` beat `10.0°` or `12.0°` during the fine pass.
+At `θ = 5°`, use `cos θ≈0.996`, `sin θ≈0.087`. Point `p5=(2.5,0)` projects to `u≈2.490`, `v≈-0.218`; point `p11=(0,1.5)` projects to `u≈0.131`, `v≈1.494`. The extents become roughly `u_min=0`, `u_max=2.490`, `v_min=-0.218`, `v_max=1.494`. For L-edges `v_min` and `u_min`, `p2=(1.0,0)` has `(u,v)≈(0.996,-0.087)`, nearest `v_min`, distance `0.131`, contribution about `7.6`. `p8=(0,0.75)` has `(u,v)≈(0.065,0.747)`, nearest `u_min`, distance `0.065`, contribution about `15.3`. Reciprocal votes give smaller `C(5°)` than `C(0°)`, so the coarse pass prefers `0°`. In real clusters the same arithmetic makes `11.5°` beat `10.0°` or `12.0°`.
 
 ### Usage
 
