@@ -12,7 +12,7 @@ tags:
 
 # 5.5 Multi-object tracking — Kalman / IMM / JPDA
 
-The Ch 5 classical pipeline is `preprocess → ground → cluster → fit → track`. Tracking is the temporal step: it turns per-frame fitted boxes from [[5_4_object_shape_fitting_EN|Ch 5 §5.4]] into object histories with identity, velocity, lifecycle status, and uncertainty. A detector answers "what boxes exist in this frame?" A tracker answers "which boxes belong to the same actor over time?"
+The Ch 5 classical pipeline is `preprocess → ground → cluster → fit → track`. Tracking is the temporal step: it turns per-frame fitted boxes from [[5_4_object_shape_fitting_EN|§5.4]] into object histories with identity, velocity, lifecycle status, and uncertainty. A detector answers "what boxes exist in this frame?" A tracker answers "which boxes belong to the same actor over time?"
 
 The input contract has a fixed **binding tuple** plus required message metadata and optional side-channel diagnostics. §5.4 produces, per frame:
 
@@ -35,7 +35,7 @@ with a covariance estimate.
 
 **The tracking state is maintained in `odom`, not `base_link`.** A track's velocity is the actor's velocity in the locally-consistent `odom` frame; `base_link` is the ego-vehicle's body frame, so a stationary actor in `base_link` carries the *negative* ego velocity, and a CV-KF in `base_link` would treat every parked car as moving backward at ego speed. Tracking in `odom` (per [[2_3_lidar_localization_EN|Ch 2 §2.3]]) handles ego-motion compensation through the `base_link → odom` transform applied at the measurement timestamp.
 
-The timestamp contract: §5.4 boxes carry a `header.stamp` equal to the §5.1 sweep-end deskew time (the same convention `PointCloud2` uses, per [[5_8_ros2_integration_EN|Ch 5 §5.8]]). When a detection arrives, the tracker (1) advances each existing track's prediction to that `header.stamp` (computing `dt` from the previous track update), (2) looks up `T_odom_base_link(header.stamp)` from TF2 to transform the detection into `odom`, and (3) runs the Kalman update at that timestamp. Late or out-of-order detections (where `header.stamp < latest_track_time`) are either rejected, buffered for short-window reordering, or processed by an out-of-sequence-measurement (OOSM) update — the choice is policy. TF2 lookups beyond the buffer horizon, or when the `base_link → odom` chain is stale, must surface as a diagnostic; silently using the latest available transform is the same kind of bug as silently consuming stale `/tf` in §5.1 deskew.
+The timestamp contract: §5.4 boxes carry a `header.stamp` equal to the §5.1 sweep-end deskew time (the same convention `PointCloud2` uses, per [[5_8_ros2_integration_EN|§5.8]]). When a detection arrives, the tracker (1) advances each existing track's prediction to that `header.stamp` (computing `dt` from the previous track update), (2) looks up `T_odom_base_link(header.stamp)` from TF2 to transform the detection into `odom`, and (3) runs the Kalman update at that timestamp. Late or out-of-order detections (where `header.stamp < latest_track_time`) are either rejected, buffered for short-window reordering, or processed by an out-of-sequence-measurement (OOSM) update — the choice is policy. TF2 lookups beyond the buffer horizon, or when the `base_link → odom` chain is stale, must surface as a diagnostic; silently using the latest available transform is the same kind of bug as silently consuming stale `/tf` in §5.1 deskew.
 
 Published tracks are emitted in `odom` with `header.frame_id = odom`; downstream consumers that need `base_link` (planner near-field, visualization) reproject using the same ego-pose lookup. `map` is used when global consistency over hours of operation is required (HD-map-relative consumers, longer-horizon prediction). The frame must be explicit on every message; `base_link`, `odom`, and `map` are not interchangeable labels, and a tracker that runs filter math in `base_link` without explicit ego-motion compensation is a known failure pattern, not a stylistic choice.
 
@@ -459,7 +459,7 @@ This distinction matters for [[7_0_overview_EN|Ch 7]] fusion. Fusion receives tr
 
 The uncertainty estimate is typically the Kalman covariance over dynamic state, attached as a per-track field. Treating "active tracks" and "tombstones" as one bucket (the round-1 framing) blurs the contract; treating them separately makes the lifecycle explicit on the wire.
 
-Frame policy for this chapter: the tracker maintains and publishes primary tracks in `odom` (per the section opening). Diagnostics monitor ego-pose freshness — staleness in the `base_link → odom` transform shows up as a tracking failure, not a §5.1 or §5.8 failure, because every measurement transform consumes that lookup. Downstream `base_link` consumers (planner near-field, visualization) reproject from `odom`. [[5_6_registration_EN|Ch 5 §5.6]] is relevant when localization is degraded enough that the `odom → map` connection or even the `base_link → odom` consistency must be refreshed by registration.
+Frame policy for this chapter: the tracker maintains and publishes primary tracks in `odom` (per the section opening). Diagnostics monitor ego-pose freshness — staleness in the `base_link → odom` transform shows up as a tracking failure, not a §5.1 or §5.8 failure, because every measurement transform consumes that lookup. Downstream `base_link` consumers (planner near-field, visualization) reproject from `odom`. [[5_6_registration_EN|§5.6]] is relevant when localization is degraded enough that the `odom → map` connection or even the `base_link → odom` consistency must be refreshed by registration.
 
 Per the [[5_4_object_shape_fitting_EN|§5.4]] output contract, fitted boxes carry side-channel diagnostic fields alongside the binding tuple: `extent_source ∈ {visible_only, class_prior_backfill}`, `class_prior_source ∈ {none, dimension_lookup, upstream_class, tracker_history}`, `yaw_confidence ∈ [0, 1]`, and `corner_visibility ∈ {two_corners, one_corner, no_corner}`. These fields adjust §5.5 measurement noise, yaw update eligibility, and shape-state confirmation — they do not add a "class confidence" the binding tuple does not have:
 
@@ -479,7 +479,7 @@ Per the [[5_4_object_shape_fitting_EN|§5.4]] output contract, fitted boxes carr
 
 ## Runtime-budget row
 
-Per the [[5_9_deployment_runtime_EN|Ch 5 §5.9]] contract, the section contributes one row to the chapter-wide runtime table. Values below assume C++ implementation, CV-KF / optional IMM prediction, Hungarian GNN association, 3D / BEV IoU plus Mahalanobis gating, ~50 detections/frame, and ~30 active tracks.
+Per the [[5_9_deployment_runtime_EN|§5.9]] contract, the section contributes one row to the chapter-wide runtime table. Values below assume C++ implementation, CV-KF / optional IMM prediction, Hungarian GNN association, 3D / BEV IoU plus Mahalanobis gating, ~50 detections/frame, and ~30 active tracks.
 
 | stage | compute | frame_rate_assumption | point_count_assumption | latency_p50_ms | latency_p99_ms | memory_mb | cadence | tf_freshness_assumption | assumptions_and_caveats |
 |---|---|---|---:|---:|---:|---:|---|---|---|
