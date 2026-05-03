@@ -120,7 +120,7 @@ The main failure modes are over-clearing and under-clearing. Over-clearing appea
 
 Hornung et al. introduced OctoMap in 2013 as a probabilistic 3-D occupancy mapping framework backed by an octree. The pedagogical claim is that OctoMap is **the recursive Bayes occupancy update of the previous subsection, lifted from a flat 2-D BEV grid to a hierarchical 3-D octree**. The log-odds update equation is identical; what changes is the spatial container and how cells subdivide.
 
-An octree partitions space into cubic cells; each cell either stores a leaf log-odds value or has eight children. In OctoMap, leaf cells carry log-odds; inner-node values are derived from children (typically the maximum or a clamped accumulation) so that pruning can collapse a homogeneous subtree into a single coarse cell. A cell subdivides into eight children **only where occupancy varies** within it, so the practical effect is multi-resolution: a large region of homogeneous empty air or a single uninterrupted wall *can* remain as one coarse cell after pruning, while a tree's foliage subdivides down to the leaf resolution. The qualifier "homogeneous" matters — a wall observed by a few rays at sub-leaf incidence will not collapse, and dense urban scenes pay much closer to flat-grid memory than the highway-emptiness case suggests. For an ODD that includes long, mostly empty highway stretches, the multi-resolution benefit is substantial; for a dense city block it is modest. Memory should be measured on representative scenes rather than estimated from theoretical bounds.
+An octree partitions space into cubic cells; each cell either stores a leaf log-odds value or has eight children. In OctoMap, leaf cells carry log-odds; inner-node values are derived from children (typically the maximum or a clamped accumulation) so that pruning can collapse a homogeneous subtree into a single coarse cell. Internal nodes are allocated along the rays and endpoints touched during sensor updates; homogeneous subtrees (all eight children at the same occupancy state) can be pruned later, leaving an adaptive tree that uses memory only where occupancy varies. The qualifier "homogeneous" matters — a wall observed by a few rays at sub-leaf incidence will not collapse, and dense urban scenes pay much closer to flat-grid memory than the highway-emptiness case suggests. For an ODD that includes long, mostly empty highway stretches, the multi-resolution benefit is substantial; for a dense city block it is modest. Memory should be measured on representative scenes rather than estimated from theoretical bounds.
 
 OctoMap exposes the same operating knobs as a 2-D grid (`l_occ`, `l_free`, `l_min`, `l_max`, leaf resolution, occupancy threshold) plus the octree-specific ones (maximum depth, pruning policy). Free-space carving uses a 3-D ray-casting traversal that descends the tree and updates leaves along the ray. The reference C++ implementation `octomap::OcTree` is what most ROS2 stacks integrate.
 
@@ -221,7 +221,7 @@ ROI gating is then policy, and the policy choice has a real safety / performance
 - **Footprint-overlap fraction**: gated in if the overlap between the cluster's BEV footprint and the ROI exceeds a fraction (e.g. 0.5). Tunable middle ground. Requires a cluster footprint (the §5.4 OBB or convex hull) rather than just a centroid.
 - **Dilated-ROI**: the ROI grid is *dilated* (morphological inflation) by `k` cells before lookup, and any of the granularities above runs against the dilated grid. The buffer absorbs sub-cell localization drift and edge actors but admits more sidewalk content.
 
-The right choice is ODD-dependent and policy-dependent. Apollo's classical pipeline used a footprint-overlap variant with a buffer; Autoware exposes ROI granularity as a parameter; safety-critical deployments often pair "any-cell" with a strict size / class filter to keep performance manageable. The single-cell-per-cluster lookup itself is a constant-time operation; the cost difference between granularities is in how the cluster footprint is queried, not in the LUT.
+The right choice is ODD-dependent and policy-dependent. Apollo-style classical ROI gating uses footprint-overlap with a small buffer (e.g., `2 m`); Autoware's `compare_map_segmentation` exposes map-subtraction tolerances such as `distance_threshold`, while Autoware ROI gating uses separate lanelet / drivable-area filters not covered here in depth. Safety-critical deployments often pair "any-cell" with a strict size / class filter to keep performance manageable. The single-cell-per-cluster lookup itself is a constant-time operation; the cost difference between granularities is in how the cluster footprint is queried, not in the LUT.
 
 After the gating policy is chosen, clusters that pass it are passed downstream; the rest are *gated out* of the primary detection path. The performance cost remains close to one BEV index lookup per queried cell.
 
@@ -264,23 +264,23 @@ The gating is a performance and a safety lever at once. On the performance side,
 
 ## Autoware `compare_map_segmentation` — map subtraction
 
-Autoware's `compare_map_segmentation` is the second classical map-aided pattern. The node consumes a prior point-cloud map of the static environment (typically built once via offline SLAM and persisted as PCD tiles) and the live `PointCloud2`. It registers the live cloud to the prior map — directly using **Role 2 from [[5_6_registration_EN|§5.6]]**, *map subtraction for change detection* — and emits the residual: every live point that the prior map does not explain within a tolerance.
+Autoware's `compare_map_segmentation` is the second classical map-aided pattern. The node consumes a prior point-cloud map of the static environment (typically built via offline SLAM and persisted as PCD tiles), the live `PointCloud2`, and the map-frame transform supplied by upstream localization (`ndt_localizer`, pose estimator, or current `map → base_link` / `map → lidar` chain). It does **not** perform NDT or GICP registration internally. It places live points in the map frame, compares them against the prior map by distance / voxel / elevation tests, and emits every live point the prior map does not explain within a tolerance.
 
 What survives the subtraction is, by construction, **unexplained by the prior map** — and is *only approximately* "dynamic." The unexplained set includes genuinely dynamic actors (vehicles, pedestrians, cyclists), but also localization residual error, map staleness (construction, vegetation growth, repainted lanes), sensor viewpoint differences from the build sweep, density mismatch, and tolerance-edge effects. The classical detection-by-elimination chain is then `map subtraction → clustering → fitting → tracking`, with a far smaller input cloud at the clustering stage than the unfiltered version would receive — and a downstream tracker / temporal filter that has to separate true dynamic actors from the residual's static-but-unexplained content. The mental model "subtraction yields dynamic" is a useful first cut; the operational truth is "subtraction yields *unexplained*, and the rest of the pipeline does the dynamic-vs-static call."
 
-Two operating cadences matter. The registration step (the alignment that makes the subtraction meaningful) typically runs **sub-rate** — every Nth frame, with the most recent transform held in between — because GICP or NDT scan-to-map at 10 Hz can be expensive. The subtraction itself runs **every frame** as a cell-wise residual against the registered map. The cadence split is one of the runtime patterns §5.9 inherits.
+Two operating cadences matter. The localization / pose-estimation step that supplies the alignment may run at its own cadence — sometimes sub-rate, with the most recent accepted transform held in between — because scan-to-map localization such as GICP or NDT can be expensive at 10 Hz. `compare_map_segmentation` consumes that transform and runs residual extraction against the prior map on its input cloud cadence. The cadence split is one of the runtime patterns §5.9 inherits.
 
 `compare_map_segmentation` is a different shape of map-aided gating from the Apollo HDMap pattern. The Apollo lookup gates **where to look** (drivable polygons); Autoware's subtraction gates **what the static prior fails to explain** (operationally "unexplained," which is only approximately "dynamic"). They are complementary and a stack may use both.
 
 ### Mechanics and Worked Example
 
-The hot path is a nearest-prior test after registration:
+The hot path is a nearest-prior test after receiving an already-registered pose:
 
 ```text
 input:
   P_live       live points in lidar/base_link at sweep stamp
   M_static     prior point-cloud map tile in map frame
-  T_map_live   NDT/GICP registration from §5.6 Role 2
+  T_map_live   transform from upstream localization / pose estimation
   d_thresh     distance tolerance, e.g. 0.25-0.50 m
 
 for each live point p:
@@ -294,30 +294,30 @@ for each live point p:
 cluster residual points → fit boxes or generic volumes → track / fuse
 ```
 
-Most implementations use a voxel hash or KD-tree over the prior tile, often with a z-aware gate and sometimes an intensity or normal-consistency check. The tolerance is not just sensor noise. It must cover map point density, localization residual, seasonal vegetation changes, and viewpoint mismatch between the map-building sweep and the live sweep. A small `d_thresh` increases dynamic recall but floods the residual with static ghosts; a large `d_thresh` suppresses ghosts but hides actors close to mapped structures.
+Most implementations use a voxel hash or KD-tree over the prior tile, often with a z-aware gate / elevation test and sometimes intensity or normal consistency. The tolerance is not just sensor noise. It must cover map point density, localization residual, seasonal vegetation changes, and viewpoint mismatch between the map-building sweep and the live sweep. A small `d_thresh` increases dynamic recall but floods the residual with static ghosts; a large `d_thresh` suppresses ghosts but hides actors close to mapped structures.
 
-Worked example. A live scan is NDT-aligned to a prior PCD map with final residual diagnostics inside the §5.6 acceptance gate:
+Worked example. Upstream localization has already accepted the pose that places the live scan in the prior PCD map frame:
 
 ```text
-NDT accepted:
-  translation delta from ego prior = 0.18 m
-  yaw delta from ego prior         = 0.3°
-  fitness score                    = pass
+upstream pose accepted:
+  T_map_live age                  = 35 ms
+  localization health             = pass
+  residual / covariance gate       = pass
 
 d_thresh = 0.35 m
 min residual cluster size = 8 points
 ```
 
-After transforming live points into `map`, three groups appear:
+In `map`, each point is tested against the prior tile's KD-tree:
 
 | live structure | nearest-prior distance pattern | decision |
 |---|---:|---|
-| building facade | `0.03-0.18 m` | explained; suppress |
-| parked car present in the map | `0.05-0.22 m` | explained; suppress |
-| pedestrian crossing the lane | `0.55-1.10 m` | unexplained; keep |
-| new construction sign near curb | `0.40-0.75 m` | unexplained; keep, but not necessarily dynamic |
+| building facade | `0.03-0.18 m` from prior facade points | explained by prior; suppress |
+| parked car present in the map | `0.05-0.22 m` from prior car points | explained by prior; suppress |
+| pedestrian crossing the lane | `0.55-1.10 m` from nearest prior points | unexplained / residual; keep |
+| new construction sign near curb | `0.40-0.75 m` from nearest prior points | unexplained / residual; keep, but not necessarily dynamic |
 
-The residual extractor emits the pedestrian points and the construction-sign points. Clustering then creates two residual components. The tracker may classify the first as dynamic after temporal motion; the second may remain static but still unexplained by the prior map. This is the main conceptual point: `compare_map_segmentation` is a *residual extractor*, not a truth oracle for motion. If the NDT alignment had failed or the transform freshness had expired, the correct behavior would be to bypass subtraction or mark the residual stream degraded; otherwise an alignment error would make the entire static facade look dynamic.
+The residual extractor emits the pedestrian points and the construction-sign points. Clustering then creates two residual components. The tracker may classify the first as dynamic after temporal motion; the second may remain static but still unexplained by the prior map. This is the main conceptual point: `compare_map_segmentation` is a *residual extractor*, not a truth oracle for motion. If the upstream localization transform had failed its health gate or the transform freshness had expired, the correct behavior would be to bypass subtraction or mark the residual stream degraded; otherwise an alignment error would make the entire static facade look dynamic.
 
 The Apollo-vs-Autoware distinction is therefore:
 
@@ -353,4 +353,4 @@ Per the [[5_9_deployment_runtime_EN|§5.9]] contract, the section commits one ro
 
 | stage | compute | frame_rate_assumption | point_count_assumption | latency_p50_ms | latency_p99_ms | memory_mb | cadence | tf_freshness_assumption | assumptions_and_caveats |
 |---|---|---|---|---|---|---|---|---|---|
-| `5_7_occupancy_freespace_map_roi` | cpu (gpu-optional) | 10 Hz spinning | ~60k pts/frame after §5.1 voxel downsample (VLP-32C single-return) | 8 | 25 | 220 | every-frame for occupancy update + ROI gating; map-subtraction registration sub-rate (every 3rd frame, per Role 2) | ≤ 50 ms | **Illustrative** combined budget for a single-roof-LiDAR C++ ROS2 node running 2-D BEV occupancy update with ray casting + Apollo-style HDMap ROI lookup + `compare_map_segmentation`-style map subtraction gated on the §5.6 Role-2 registration cadence. **OctoMap as a 3-D layer is *excluded* from these numbers** and adds ~50–200 MB and several extra ms of latency depending on scene complexity. Within the included scope: ray casting dominates latency; ROI lookup is sub-millisecond because the LUT is precomputed; map subtraction adds a fraction of a millisecond per frame plus the registration cost on its sub-rate ticks. GPU acceleration of ray casting (CUDA Bresenham kernels) is available in some stacks and can roughly halve the CPU latency when present; assumed *off* here. Memory: BEV grid (~ a few MB at the configured resolution) + one tile of the HD-map ROI LUT (~ tens of MB) + a short ring buffer of recent occupancy snapshots and the registered prior-map tile (~ 100–200 MB), summing to the ~220 MB illustrative figure. Numbers exclude downstream clustering and tracking and should be measured per deployment.
+| `5_7_occupancy_freespace_map_roi` | cpu (gpu-optional) | 10 Hz spinning | ~60k pts/frame after §5.1 voxel downsample (VLP-32C single-return) | 8 | 25 | 220 | every-frame for occupancy update + ROI gating; map-subtraction localization sub-rate (every 3rd frame as an illustrative cadence drawn from the §5.9 budget table, not a universal default) | ≤ 50 ms | **Illustrative** combined budget for a single-roof-LiDAR C++ ROS2 node running 2-D BEV occupancy update with ray casting + Apollo-style HDMap ROI lookup + `compare_map_segmentation`-style map subtraction gated on the §5.6 Role-2 localization / pose cadence. **OctoMap as a 3-D layer is *excluded* from these numbers** and adds ~50–200 MB per the §5.9 illustrative budget and several extra ms of latency depending on scene complexity. Within the included scope: ray casting dominates latency; ROI lookup is sub-millisecond because the LUT is precomputed; map subtraction adds a fraction of a millisecond per frame, illustrative on the §5.9 Jetson-class assumption, plus localization cost on sub-rate ticks. GPU acceleration of ray casting (CUDA Bresenham kernels) is available in some stacks and can roughly halve CPU latency when present, but this is implementation-dependent and illustrative; assumed *off* here. Memory: BEV grid (~ a few MB at the configured resolution) + one tile of the HD-map ROI LUT (~ tens of MB) + a short ring buffer of recent occupancy snapshots and the registered prior-map tile (~ 100–200 MB), summing to the ~220 MB illustrative figure. Numbers exclude downstream clustering and tracking and should be measured per deployment.
