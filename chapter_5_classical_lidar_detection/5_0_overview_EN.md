@@ -38,15 +38,15 @@ tags:
 | § | Title | Status (EN) | Status (ZH) |
 |---|-------|:-----------:|:-----------:|
 | 5.0 | Overview (this page) | ● | ◐ |
-| 5.1 | Point-cloud preprocessing (incl. *Representation map* primer) | ◐ (extending) | ○ |
-| 5.2 | Ground segmentation (RANSAC etc.) | ◐ (extending) | ○ |
-| 5.3 | Clustering — Euclidean, DBSCAN | ◐ (extending) | ○ |
-| 5.4 | Object-shape fitting — L-shape, OBB, class priors | ◐ (extending) | ○ |
-| 5.5 | Multi-object tracking — Kalman / IMM / JPDA | ◐ (extending) | ○ |
-| 5.6 | Registration — ICP / NDT / GICP (depth behind [[2_0_overview_EN\|Ch 2]] localization, plus four perception roles) | ◐ (extending) | ○ |
-| 5.7 | Occupancy, free-space & map-aided ROI gating | ◐ (extending) | ○ |
-| 5.8 | ROS2 integration | ◐ (extending) | ○ |
-| 5.9 | Deployment & runtime constraints — CPU/GPU budget, latency, timing, field robustness | ◐ (extending) | ○ |
+| 5.1 | Point-cloud preprocessing (incl. *Representation map* primer) | ● | ○ |
+| 5.2 | Ground segmentation (RANSAC etc.) | ● | ○ |
+| 5.3 | Clustering — Euclidean, DBSCAN | ● | ○ |
+| 5.4 | Object-shape fitting — L-shape, OBB, class priors | ● | ○ |
+| 5.5 | Multi-object tracking — Kalman / IMM / JPDA | ● | ○ |
+| 5.6 | Registration — ICP / NDT / GICP (depth behind [[2_0_overview_EN\|Ch 2]] localization, plus four perception roles) | ● | ○ |
+| 5.7 | Occupancy, free-space & map-aided ROI gating | ● | ○ |
+| 5.8 | ROS2 integration | ● | ○ |
+| 5.9 | Deployment & runtime constraints — CPU/GPU budget, latency, timing, field robustness | ● | ○ |
 | 5.10 | Safety & validation (template instance) | ● | ○ |
 
 ## Further reading
