@@ -231,7 +231,7 @@ Downsampling must also respect ordering assumptions. Once a cloud is voxelized a
 
 ### 5.1.x Representation map
 
-Representations are the substrate before the algorithms appear. Ch 5 uses four classical representations, and each one makes different assumptions about the sensor and the downstream method.
+Representations are the substrate before the algorithms appear. Ch 5 uses five classical representations, and each one makes different assumptions about the sensor and the downstream method.
 
 | representation | what it is | methods it enables | sensor topology assumptions | downstream Ch 5 use |
 |---|---|---|---|---|
