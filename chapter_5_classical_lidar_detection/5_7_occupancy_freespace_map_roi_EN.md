@@ -25,6 +25,8 @@ The failure modes are stories about how the two halves couple. A stale HD map su
 
 The BEV grid substrate is the one introduced in [[5_1_pointcloud_preprocessing_EN|§5.1]]'s representation map: a top-down raster over the gravity-aligned ground plane, indexed by `(i, j)` cells of width `r` (typical `r = 0.1 m` to `0.4 m`), with channels for max height, density, occupancy, and so on. Frames follow [[1_1_coordinate_frames_EN|Ch 1 §1.1]]: the live cloud arrives in `lidar` and is transformed into `base_link` (sensor extrinsics) and then into `map` for any operation that touches a prior map. The "`map` frame" assumption is exactly what [[2_5_map_relative_localization_EN|Ch 2 §2.5]] provides — a globally consistent frame whose origin is fixed to a surveyed reference and in which HD-map polygons are authored. HD-map *freshness* and *change detection* (was this junction repainted last week?) is the responsibility of [[2_7_hd_map_management_EN|Ch 2 §2.7]]; this section consumes a map that may be stale and treats staleness as a failure mode. Registration roles from [[5_6_registration_EN|§5.6]] enter as follows: **Role 4 (map-aided ROI consistency)** keeps the ROI lookup aligned to the live cloud; **Role 2 (map subtraction for change detection)** is the registration that makes Autoware's `compare_map_segmentation` safe; and **Role 3 (multi-frame accumulation alignment)** is the role the occupancy update borrows when it accumulates static evidence across sweeps. The same `§5.6` roles thus serve different parts of this section.
 
+The section's output contract is: **occupancy grid + ROI mask + free-space layer + GOD candidates**. The primary detector consumes the ROI mask as a gate; the planner consumes the free-space layer and obstacle candidates; Ch 7 fusion may consume the occupancy grid as a geometric prior or veto.
+
 ## 2-D occupancy grids in log-odds
 
 An occupancy grid stores, for each BEV cell `c`, the posterior probability `p(c | z_{1:t})` that the cell is occupied given all sensor measurements up to time `t`. The classical recursive Bayes update is more convenient in **log-odds** form because the recursion becomes a sum:
@@ -42,13 +44,77 @@ Two practical details govern stability. **Clamping** caps `l(c)` to a fixed inte
 > [!tip]
 > A cell whose log-odds has saturated at `l_max` for hours is not the same as a cell whose log-odds just crossed the occupancy threshold. Downstream consumers that need this distinction (e.g., Generic Obstacle Detection wanting only *fresh* hits) should read the timestamp of last update alongside the log-odds value, not just the binary thresholded grid.
 
+### Worked Example — three sweeps on a 5×5 grid
+
+Use a toy BEV grid with the ego sensor at the bottom center, cell `(row=4, col=2)`. The row index increases downward in the sketch; physically, smaller row means farther forward. Let
+
+```text
+l_0 = 0.0
+l_occ = +0.85     p ≈ 0.70
+l_free = -0.40    p ≈ 0.40
+l_min = -2.0
+l_max = +3.5
+occupied threshold: l > +0.7
+free threshold:     l < -0.7
+```
+
+Sweep 1 sees a return at `(1,2)`. Bresenham traversal clears `(3,2)` and `(2,2)`, then marks `(1,2)` occupied. Sweep 2 sees the same obstacle again but from slight ego motion, clearing `(3,1)` and `(2,2)`, then marking `(1,2)`. Sweep 3 sees no hit along the center ray out to `(0,2)`, so it clears `(3,2)`, `(2,2)`, `(1,2)`, and `(0,2)` but marks no occupied endpoint. The log-odds after the three sweeps are:
+
+```text
+after sweep 0 (prior)             after sweep 1
+
+ r\c  0    1    2    3    4        r\c  0    1    2    3    4
+ 0   .    .    .    .    .          0   .    .    .    .    .
+ 1   .    .    .    .    .          1   .    .   +.85 .    .
+ 2   .    .    .    .    .          2   .    .   -.40 .    .
+ 3   .    .    .    .    .          3   .    .   -.40 .    .
+ 4   .    .    S    .    .          4   .    .    S    .    .
+
+legend: S=sensor cell, .=no update / l=0.0
+```
+
+```text
+after sweep 2                     after sweep 3
+
+ r\c  0    1    2    3    4        r\c  0    1    2    3    4
+ 0   .    .    .    .    .          0   .    .   -.40 .    .
+ 1   .    .  +1.70 .    .          1   .    .  +1.30 .    .
+ 2   .    .   -.80 .    .          2   .    .  -1.20 .    .
+ 3   .  -.40 -.40 .    .          3   .  -.40 -.80 .    .
+ 4   .    .    S    .    .          4   .    .    S    .    .
+```
+
+The example shows three invariants. First, repeated endpoint hits accumulate positive evidence: `(1,2)` crosses the occupied threshold after sweep 1 and becomes stronger after sweep 2. Second, repeated pass-through cells accumulate negative evidence: `(2,2)` crosses the free threshold after sweep 2. Third, contradictory evidence is arithmetic, not a special case: sweep 3 does not delete the obstacle at `(1,2)`; it subtracts `0.40`, lowering `+1.70` to `+1.30`. A fourth center-clear sweep would lower it to `+0.90`, a fifth to `+0.50`, below the occupied threshold. That lag is intentional. The grid should not erase a two-sweep obstacle because one ray missed it, but it also must not keep it forever once clearing evidence repeats.
+
 ## Free-space carving via ray casting
 
 Free-space comes from ray casting, not from the absence of returns. For every laser ray, the cells along the segment from the sensor origin to the first hit are *cleared* (their log-odds receive `l_free`), and the cell containing the hit is *occupied* (it receives `l_occ`). Cells beyond the hit are not touched — the ray did not see through the surface. Bresenham-style line traversal in 2-D, or the 3-D variant for OctoMap, enumerates the cells a ray crosses in `O(L / r)` time per ray, where `L` is the ray length and `r` is the cell size.
 
+The first-return policy is the default for carving. If the sensor reports multiple returns, the earliest physical surface should bound the free-space segment; later returns may still be useful for object evidence, but using a far return to clear every cell before it can carve through vegetation, glass, spray, or a thin pole. The magnitude of `l_free` should usually be smaller than `l_occ` because a miss is less informative than a hit: one beam passing through a cell only says that no surface blocked that beam inside that cell, while a hit says the beam ended there. A common starting ratio is `|l_free| ≈ 0.4-0.6 · l_occ`, then adjusted against replay logs for flicker and persistence.
+
 Ray casting is what makes the grid learn drivable area in the classical sense. After a few sweeps along a clear road, the cells in front of the vehicle accumulate negative log-odds and cross the *free* threshold; obstacle cells stay positive; never-observed cells stay near zero. A planner can then read "drivable area" as cells with `l(c) < l_free_thresh` *and* a recent update timestamp.
 
 The free-space carving operation is also where the classical occupancy framework gets its safety guarantee: a cell is declared free only because a specific ray passed through it without hitting anything. There is no inference from "I have not seen an obstacle here" — the absence of evidence is not evidence of absence. This is the load-bearing distinction between an honest occupancy grid and a map that quietly assumes the unseen world is empty.
+
+```text
+ray-casting-through-glass mechanism
+
+true glass surface            far specular return
+      |                              x
+      |                             /
+      |                            /
+ lidar o----free----free----free--/       bad carve if far return is used
+            cells weakened behind glass
+
+correct policy: prefer the first physical surface for carving; cap l_free
+so one specular ray cannot erase a previously occupied cell.
+```
+
+### Usage and failure modes
+
+Use ray casting for cells whose beam geometry is known: a spinning LiDAR with ring and azimuth metadata, a range image from §5.1, or a point cloud whose per-point origin can be reconstructed. Do not apply "free" updates to all cells in front of the vehicle just because no point landed there. Ray casting also needs a maximum range policy. A no-return ray can clear up to the sensor's reliable range only if the sensor driver actually reports that ray as valid no-return evidence; many point-cloud messages contain only returns, not the missing beams.
+
+The main failure modes are over-clearing and under-clearing. Over-clearing appears when specular returns, wrong return selection, or extrinsic error cause free-space carving through an object. Under-clearing appears when `l_free` is too weak, maximum range is too short, or the implementation refuses to update cells unless an endpoint exists. Both are visible in the log-odds time series: over-clearing drives obstacle cells below threshold too quickly; under-clearing leaves stale occupied cells in the planner's path long after the actor moved.
 
 ## OctoMap — the same math, lifted to 3-D
 
@@ -67,6 +133,58 @@ The per-class detector (whether classical clustering + L-shape fitting from [[5_
 
 The construction is simple. Take the occupancy grid (or the OctoMap volume), threshold cells at log-odds above `l_occ_thresh`, run connected components on the thresholded grid, filter components by minimum size and minimum height-above-ground, and emit each surviving component as a *generic obstacle* — a class-agnostic 3-D bounding volume with no class label, only an "occupied volume here, planner please avoid" semantic. The detector works because it asks a question the per-class detector does not: "is there any geometry in this cell that the ground plane does not explain?" The answer is independent of object identity.
 
+Its output contract is deliberately narrower than a per-class detector's contract:
+
+```text
+(footprint_or_box, z_min, z_max, velocity_optional, class=generic, source=occupancy)
+```
+
+The planner should treat `class=generic` as "avoid this volume" rather than as a weak semantic label. If a later fusion layer associates the same volume with a vehicle track, the generic candidate can be suppressed or merged; if no semantic detector explains it, the generic candidate still carries obstacle authority.
+
+Mechanically, Generic Obstacle Detection is the same connected-component shape as §5.3 clustering, but its input is a raster or voxel occupancy layer rather than raw residual points. The usual sequence is:
+
+```text
+1. select fresh occupied cells:
+     l(c) > l_occ_thresh
+     age(c) < max_age
+     height_above_ground(c) > h_min
+
+2. run connected components in BEV (4- or 8-neighbor)
+
+3. reject tiny components:
+     area_cells < min_component_cells
+     or physical area < min_area_m2
+
+4. lift the surviving BEV footprint to a 3-D volume:
+     z_min / z_max from points or voxel evidence
+     footprint from cell union, convex hull, or OBB
+
+5. publish generic obstacle candidates to the planner / fusion layer
+```
+
+The freshness gate is important. A static wall that has been occupied for minutes is not a new generic obstacle; a fresh occupied blob on the shoulder or lane is. Conversely, a component with old occupied cells and new occupied cells should not be split by timestamp alone unless the planner contract wants "new obstacle" rather than "occupied volume." A practical implementation publishes both `occupied_volume` and `last_update_age` so the consumer can decide.
+
+### Worked Example
+
+Take a `0.2 m` BEV grid after ray casting and ground removal. The Generic Obstacle Detection branch uses:
+
+```text
+l_occ_thresh = +0.7
+max_age = 0.3 s
+min_component_cells = 4
+min_height_above_ground = 0.20 m
+```
+
+After thresholding, the occupied cells are:
+
+```text
+component A: (10,20), (10,21), (11,20), (11,21), (12,21)
+component B: (4,40), (4,41)
+component C: (18,7), (19,7), (20,7), (21,7), but height=0.08 m
+```
+
+Connected components accepts A as one five-cell blob. Its footprint area is about `5 * 0.2 * 0.2 = 0.20 m²`; its height evidence is above `0.20 m`; it becomes a generic obstacle candidate, perhaps a small debris pile or a fallen box. B is rejected by `min_component_cells=4`; two occupied cells at this resolution are likely rain, spray, or a sparse reflection unless a special small-object mode is active. C has enough cells but fails the height-above-ground gate, so it is treated as curb paint, ground residual, or a shallow road artifact, not an obstacle. The worked example is intentionally identity-free: the output is not "box" or "deer"; it is "fresh occupied volume that the planner must not assume is drivable."
+
 Generic Obstacle Detection is **a common classical safety pattern** rather than an industry-wide architectural guarantee. The pattern: a class-agnostic occupancy-derived detector runs in parallel with the primary per-class detector, and the planner consumes some defined arbitration of the two — most often the union with priority rules, sometimes a confidence-weighted merge. If the primary detector misses a fallen ladder because no training image contained one, the occupancy grid still reports a tall connected component above the road surface and the planner brakes or routes around it. Apollo's classical perception, Autoware's `obstacle_segmentation`-derived nodes, and several proprietary OEM stacks describe pipelines of this shape; the *exact* arbitration policy, the false-positive controls, and whether the occupancy fallback is wired as a hard interrupt or as a soft prior vary by stack. The pedagogically reliable claim is the weaker one: "the per-class detector is not class-complete, and a class-agnostic geometric path is the most common classical answer to that gap." The strong claim — *every* deployed stack must carry such a fallback or risk a safety-case rejection — is a design recommendation this section makes, not an industry observation it can certify. Section 5.10 picks up the validation requirements; Ch 11 owns the formal safety-case process.
 
 ## HD-map ROI gating — the Apollo HDMap pattern
@@ -80,14 +198,19 @@ The C++ pseudocode is small enough to write inline:
 ```cpp
 // hd_map_roi_lookup.cpp (sketch)
 // Precomputed at tile load:
-//   roi_grid_(i, j) = 1 if cell center lies inside any drivable polygon, else 0.
+//   roi_grid_(row_y, col_x) = 1 if the cell center lies inside any drivable
+//   polygon, else 0. Row follows map y; column follows map x.
 // On the hot path, called per **primary-detection** cluster only —
 // the occupancy / Generic Obstacle Detection fallback runs on an ungated domain.
 bool IsInROI(const Eigen::Vector3d& p_map) const {
-  const int i = static_cast<int>((p_map.x() - origin_x_) / cell_size_);
-  const int j = static_cast<int>((p_map.y() - origin_y_) / cell_size_);
-  if (i < 0 || j < 0 || i >= rows_ || j >= cols_) return false;
-  return roi_grid_(i, j) != 0;
+  const int col_x =
+      static_cast<int>(std::floor((p_map.x() - origin_x_) / cell_size_));
+  const int row_y =
+      static_cast<int>(std::floor((p_map.y() - origin_y_) / cell_size_));
+  if (row_y < 0 || col_x < 0 || row_y >= rows_ || col_x >= cols_) {
+    return false;
+  }
+  return roi_grid_(row_y, col_x) != 0;
 }
 ```
 
@@ -102,6 +225,41 @@ The right choice is ODD-dependent and policy-dependent. Apollo's classical pipel
 
 After the gating policy is chosen, clusters that pass it are passed downstream; the rest are *gated out* of the primary detection path. The performance cost remains close to one BEV index lookup per queried cell.
 
+### Worked Example — truck on an ROI edge
+
+Suppose an HD-map tile contains a drivable lane polygon whose right edge is `y = 0.0 m` in the `map` frame. The raster has `cell_size = 0.5 m`, `origin_x = 0`, `origin_y = -5`, and the convention from the snippet: `row_y = floor((y - origin_y) / cell_size)`, `col_x = floor((x - origin_x) / cell_size)`. The rasterizer marks a cell as ROI if the **cell center** lies inside the drivable polygon. That convention matters at boundaries. A cell spanning `y ∈ [-0.5, 0.0)` has center `y=-0.25` and is inside; a cell spanning `y ∈ [0.0, 0.5)` has center `y=+0.25` and is outside. A point at `y=-0.01` and a point at `y=+0.01` may therefore land in adjacent cells with different ROI bits even though they are only `2 cm` apart.
+
+Now a truck cluster is fitted by §5.4 as an OBB footprint:
+
+```text
+center = (x=12.0, y=0.15)
+length = 8.0 m
+width  = 2.6 m
+yaw    = 0°
+```
+
+Its left half extends into the lane (`y < 0`) and its right half extends outside the lane (`y > 0`). With **centroid-only** gating, the center cell has `y=0.15`, which maps to the outside row, so the primary detector drops the truck even though a large part of its footprint occupies the lane. With **any-cell** gating, the rasterized footprint includes cells whose centers are `y=-0.25`; those cells are ROI, so the truck passes. With **overlap fraction**, if roughly `40%` of the truck footprint lies in the lane and the threshold is `0.5`, the cluster is rejected; if the threshold is `0.3`, it passes. With **dilated-ROI**, a one-cell dilation expands the drivable mask by `0.5 m`, so the centroid cell at `y=+0.25` becomes inside the buffered ROI and the truck passes under centroid gating.
+
+```text
+overhead ROI suppress visual
+
+map y
+ ^
+ | outside ROI / sidewalk          rejected by primary ROI gate
+ |      [actor B]                       x
+ |---------------------------------------------- lane edge y=0
+ | drivable ROI (cell centers inside)  [truck A straddles edge]
+ |                         #######+++++
+ |                         #######+++++     # in-lane footprint cells
+ |                         #######+++++     + outside-but-buffered cells
+ +----------------------------------------------------------> map x
+
+Primary detector: sees A if policy is any-cell / overlap / dilated; may drop B.
+GOD fallback: runs ungated or wider, so actor B can still become a generic obstacle.
+```
+
+The safety policy this book recommends is explicit: a cluster that straddles an ROI boundary should not be rejected by centroid-only lookup unless the occupancy / Generic Obstacle Detection path is independently guaranteed to catch it and the planner consumes that union. For primary detection, use any-cell or overlap-fraction against a dilated ROI when localization residual is near the cell scale. For the fallback branch, keep the evaluation domain ungated or at least wider than the primary ROI. This is exactly the `5_7.fm.map_suppresses_real_actor` catalog row in operational form.
+
 The gating is a performance and a safety lever at once. On the performance side, it removes thousands of clusters from sidewalks, building shoulders, and irrelevant off-road areas every frame, which is the difference between a tractable tracker and one that drowns in static returns. On the safety side, it is *also* the failure mode: anything outside the rasterized polygon — a child standing one tile inside a parking lot, a debris pile on the shoulder — is, by gating policy, not seen. Section 5.10 carries the validation requirement that ROI gating must be paired with a class-agnostic occupancy fallback whose evaluation domain is wider than the rasterized ROI.
 
 ## Autoware `compare_map_segmentation` — map subtraction
@@ -112,7 +270,64 @@ What survives the subtraction is, by construction, **unexplained by the prior ma
 
 Two operating cadences matter. The registration step (the alignment that makes the subtraction meaningful) typically runs **sub-rate** — every Nth frame, with the most recent transform held in between — because GICP or NDT scan-to-map at 10 Hz can be expensive. The subtraction itself runs **every frame** as a cell-wise residual against the registered map. The cadence split is one of the runtime patterns §5.9 inherits.
 
-`compare_map_segmentation` is a different shape of map-aided gating from the Apollo HDMap pattern. The Apollo lookup gates **where to look** (drivable polygons); Autoware's subtraction gates **what is dynamic** (whatever the prior cloud does not explain). They are complementary and a stack may use both.
+`compare_map_segmentation` is a different shape of map-aided gating from the Apollo HDMap pattern. The Apollo lookup gates **where to look** (drivable polygons); Autoware's subtraction gates **what the static prior fails to explain** (operationally "unexplained," which is only approximately "dynamic"). They are complementary and a stack may use both.
+
+### Mechanics and Worked Example
+
+The hot path is a nearest-prior test after registration:
+
+```text
+input:
+  P_live       live points in lidar/base_link at sweep stamp
+  M_static     prior point-cloud map tile in map frame
+  T_map_live   NDT/GICP registration from §5.6 Role 2
+  d_thresh     distance tolerance, e.g. 0.25-0.50 m
+
+for each live point p:
+  q = T_map_live · p
+  m = nearest_neighbor(q, M_static)
+  if ||q - m|| > d_thresh:
+      keep q as residual/unexplained
+  else:
+      suppress q as explained by static prior
+
+cluster residual points → fit boxes or generic volumes → track / fuse
+```
+
+Most implementations use a voxel hash or KD-tree over the prior tile, often with a z-aware gate and sometimes an intensity or normal-consistency check. The tolerance is not just sensor noise. It must cover map point density, localization residual, seasonal vegetation changes, and viewpoint mismatch between the map-building sweep and the live sweep. A small `d_thresh` increases dynamic recall but floods the residual with static ghosts; a large `d_thresh` suppresses ghosts but hides actors close to mapped structures.
+
+Worked example. A live scan is NDT-aligned to a prior PCD map with final residual diagnostics inside the §5.6 acceptance gate:
+
+```text
+NDT accepted:
+  translation delta from ego prior = 0.18 m
+  yaw delta from ego prior         = 0.3°
+  fitness score                    = pass
+
+d_thresh = 0.35 m
+min residual cluster size = 8 points
+```
+
+After transforming live points into `map`, three groups appear:
+
+| live structure | nearest-prior distance pattern | decision |
+|---|---:|---|
+| building facade | `0.03-0.18 m` | explained; suppress |
+| parked car present in the map | `0.05-0.22 m` | explained; suppress |
+| pedestrian crossing the lane | `0.55-1.10 m` | unexplained; keep |
+| new construction sign near curb | `0.40-0.75 m` | unexplained; keep, but not necessarily dynamic |
+
+The residual extractor emits the pedestrian points and the construction-sign points. Clustering then creates two residual components. The tracker may classify the first as dynamic after temporal motion; the second may remain static but still unexplained by the prior map. This is the main conceptual point: `compare_map_segmentation` is a *residual extractor*, not a truth oracle for motion. If the NDT alignment had failed or the transform freshness had expired, the correct behavior would be to bypass subtraction or mark the residual stream degraded; otherwise an alignment error would make the entire static facade look dynamic.
+
+The Apollo-vs-Autoware distinction is therefore:
+
+```text
+Apollo HDMap ROI gating:        polygon prior gates where primary detection looks.
+Autoware compare_map_segmentation: point-cloud prior gates what the static prior
+                                   fails to explain.
+```
+
+The Apollo lookup gates **where to look** (drivable polygons); Autoware's subtraction gates **what the static prior fails to explain** (operationally 'unexplained,' which is only approximately 'dynamic'). They are complementary and a stack may use both.
 
 ## Why this classical substrate survives inside DL-primary stacks
 
