@@ -2,8 +2,8 @@
 title: Workflow state snapshot
 doc_type: state-snapshot
 state_kind: manual_snapshot
-last_updated: 2026-05-03T22:00:00.000Z
-last_checked_commit: ca7133a
+last_updated: 2026-05-03T23:30:00.000Z
+last_checked_commit: 611fd3f
 generated_from: main_session
 ---
 
@@ -14,17 +14,28 @@ generated_from: main_session
 
 ## Mechanical state (auto-refreshed by PreCompact hook)
 
-- last_known_head: (current, will refresh on next PreCompact)
-- worktree_status: clean (main: clean; codex worktree: clean, behind main HEAD since the Ch 5 deal-loops continued on main; ff to main before any Ch 6 codex-writer dispatch)
+- last_known_head: `611fd3f`
+- worktree_status: clean (main: clean; codex worktree: clean, ff'd to main HEAD `611fd3f`)
 - active_batch_sentinel: null
 
 ## Reasoning state (main session updates manually)
 
-- active_chapter: **Chapter 5 COMPLETE**; next is Chapter 6 (Deep-Learning LiDAR Detection)
+- active_chapter: **Chapter 5 EXTENSION COMPLETE**; next is Chapter 6 (Deep-Learning LiDAR Detection)
 - active_phase: between chapters; ready to start Ch 6 Phase 1 (research)
 - active_batch: none
-- last_agreed_commit: Phase-6 chapter close (the chapter(5) commit publishing the chapter)
-- next_action: Chapter 5 is fully complete. All 10 drafted sections (§§5.1–5.10) at `workflow_status: complete`. §5.0 overview also `complete` after Phase-6 lockstep. TOC updated. Chapter plan updated (Item 6 wikilink rule clarified to permit intra-chapter `§N.M`; Item 1 §5.10 length cell updated to 2000–2200 reflecting the relaxed Phase-4 brief band). Phase-6 voice pass closed in 3 rounds (round 1: 6 codex critiques surfaced — main contested 1 [`p6-c3` wikilink display rule, codex conceded] and accepted 5; round 2: codex caught 2 remaining `GOD` instances missed in round-1 application; round 3: AGREED). Next steps when user ready: Ch 6 Phase 1 research (main + codex RESEARCH + gemini in parallel), then Phase 2 deal-loop, etc. Ch 6 spec from chapter plan: PointNet/++, VoxelNet/SECOND, PointPillars, CenterPoint + anchor-free 3D, Transformer-based 3D, eval metrics, deployment, safety. Ch 6 inherits Ch 5's failure-mode catalog (most entries survive structurally; some shift cause-class), the four representations (raw / voxel / range image / BEV), and the load-bearing-classical-in-DL-stacks list (preprocessing, ground seg as CNN front-end, tracking, GOD/occupancy fallback, HD-map ROI gating).
+- last_agreed_commit: `611fd3f chapter(5): Classical LiDAR Detection — extension complete; ~30k -> ~57k EN words`
+- next_action: **Chapter 5 fully complete after extension run.** Original chapter close was `94827f4` at ~30k EN words; round-W extension run completed at `611fd3f` with ~50.8k EN words (1.69× expansion). All 10 drafted sections (§§5.1–5.10) at `workflow_status: complete`; §5.0 overview also `complete`. TOC carries the extended state. Chapter plan Items 1/4/6 lockstep updated (length bands, round-W writer reallocation override, five-block + visual artifact discipline). The codex worktree is clean and ff'd to `611fd3f`. **Ready to start Ch 6 (Deep-Learning LiDAR Detection) Phase 1 research.** Ch 6 spec from chapter plan: PointNet/++, VoxelNet/SECOND, PointPillars, CenterPoint + anchor-free 3D, Transformer-based 3D, eval metrics, deployment, safety. Ch 6 inherits Ch 5's failure-mode catalog (most entries survive structurally; some shift cause-class), the five canonical representations (raw / voxel / OctoMap / range image / BEV), and the load-bearing-classical-in-DL-stacks list (preprocessing, ground seg as CNN front-end, tracking, GOD/occupancy fallback, HD-map ROI gating). Ch 6 will be drafted under round-W all-codex allocation + five-block depth standard from the start (no separate "extension" phase needed — the round-W rules apply at Phase-4 drafting).
+
+### Extension run summary (round-W, 2026-05-03)
+
+- All 10 sections drafted by codex-writer; 0 cc-writer dispatches across the run; Rule 3d escape never triggered.
+- 5 gemini Rule 3b factual spot-checks (sensor specs §5.3; Zhang authors + formulas §5.4; AB3DMOT 10D state §5.5; Chen-Medioni + GICP §5.6; Autoware compare_map_segmentation §5.7).
+- §5.10 frozen-during-extensions discipline + change-log mechanism prevented drift cascade as designed; terminal audit at `7e5a3ad` PASSED with zero proposed changes.
+- 4 main-direct writer-overhead fixes; 1 writer-unavailable-contingency (§5.7 Apollo softening when codex-writer rate-limited).
+- §5.1 t_point convention micro-revision aligned to §5.8 chapter-canonical end-of-scan / non-negative-Δt convention.
+- Phase-6 voice pass AGREED in 2 rounds (intra-Ch-5 wikilink normalization, §5.1.x renumber, §5.9 GOD compression, Deskew-heading capitalization CONTESTED + conceded).
+- Production-claim narrowing across §§5.2/5.4/5.5/5.6/5.7/5.9 consistent with the round-W §5.2 e1-c1 precedent.
+- Hybrid learned-classical caveats added in §5.5 + §5.9.
 
 ### open_conflict_threads
 
