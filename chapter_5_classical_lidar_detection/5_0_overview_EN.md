@@ -40,7 +40,7 @@ tags:
 | 5.0 | Overview (this page) | ● | ◐ |
 | 5.1 | Point-cloud preprocessing (incl. *Representation map* primer) | ● | ○ |
 | 5.2 | Ground segmentation (RANSAC etc.) | ● | ○ |
-| 5.3 | Clustering — Euclidean, DBSCAN | ● | ○ |
+| 5.3 | Clustering — Euclidean, DBSCAN | ◐ (extending) | ○ |
 | 5.4 | Object-shape fitting — L-shape, OBB, class priors | ● | ○ |
 | 5.5 | Multi-object tracking — Kalman / IMM / JPDA | ● | ○ |
 | 5.6 | Registration — ICP / NDT / GICP (depth behind [[2_0_overview_EN\|Ch 2]] localization, plus four perception roles) | ● | ○ |
