@@ -3,7 +3,7 @@ chapter: 5
 section: 6
 title: Registration — ICP / NDT / GICP
 language: EN
-workflow_status: reviewing
+workflow_status: complete
 tags:
   - book/section
   - book/chapter-5

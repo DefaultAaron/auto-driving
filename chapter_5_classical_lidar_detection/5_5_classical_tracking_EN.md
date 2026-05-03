@@ -3,7 +3,7 @@ chapter: 5
 section: 5
 title: Multi-object tracking — Kalman / IMM / JPDA
 language: EN
-workflow_status: reviewing
+workflow_status: complete
 tags:
   - book/section
   - book/chapter-5

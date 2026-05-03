@@ -2,8 +2,8 @@
 title: Workflow state snapshot
 doc_type: state-snapshot
 state_kind: manual_snapshot
-last_updated: 2026-05-02T23:30:00.000Z
-last_checked_commit: b1fc121
+last_updated: 2026-05-03T22:00:00.000Z
+last_checked_commit: ca7133a
 generated_from: main_session
 ---
 
@@ -14,21 +14,21 @@ generated_from: main_session
 
 ## Mechanical state (auto-refreshed by PreCompact hook)
 
-- last_known_head: `b1fc121`
-- worktree_status: clean (main: clean; codex worktree: clean and ff'd to `55d2c32` — was at `32884a9` with 3 stale Batch-2 leftovers, cleaned + ff'd before §5.9 cc-writer dispatch; behind main HEAD by ~3 commits since the Batch-3 deal-loop ran on main)
+- last_known_head: (current, will refresh on next PreCompact)
+- worktree_status: clean (main: clean; codex worktree: clean, behind main HEAD since the Ch 5 deal-loops continued on main; ff to main before any Ch 6 codex-writer dispatch)
 - active_batch_sentinel: null
 
 ## Reasoning state (main session updates manually)
 
-- active_chapter: 5 (Classical LiDAR Detection)
-- active_phase: 4 (per-section drafting); Batch 1 closed; Batch 2 closed; **Batch 3 closed** — §5.9 at Phase-5 AGREED in 3 rounds. Batch 4 (§5.10 safety synthesis alone) pending dispatch, awaiting user checkpoint.
-- active_batch: none — Batch 3 just closed
-- last_agreed_commit: `f7f5bd7` — `agreed(5/5_9_deployment_runtime): per-section deal-loop complete`
-- next_action: All 9 Batch-1+2+3 sections (§§5.1–5.9) at Phase-5 AGREED. Next is Batch 4 (§5.10 safety synthesis — depends on the §§5.1–5.9 failure-mode catalog entries now all populated). §5.10 was classified cc-writer at Phase 3 (high-judgment synthesis); per new Rule 3a (codex-default, allocation locked at Phase 3, no mid-run fallback), §5.10 stays cc-writer. **Batch 4 runs under the new post-2026-05-02 workflow rules:** Phase 5 asymmetric (cc-drafted §5.10 → Path A bidirectional with codex-collaborator every round; existing pattern); all section-content writes through writers (drafts AND revisions); only `main-direct: writer-overhead` survives narrow definition (spelling, dup word, broken Markdown, format artifact — no semantic change); `main-direct: minor` and `main-direct: adjudication` deprecated. Path A means §5.10 looks much like Ch 5 prior cc-drafted sections (§§5.4, 5.6, 5.7, 5.9). Infrastructure check before dispatch: clean main, no stale sentinel, optional worktree ff (cc-writer doesn't use worktree, optional this round). The first measurable codex-drafted section under the new Path B rules will be in a future chapter (Ch 5 has no remaining codex-drafted sections).
+- active_chapter: **Chapter 5 COMPLETE**; next is Chapter 6 (Deep-Learning LiDAR Detection)
+- active_phase: between chapters; ready to start Ch 6 Phase 1 (research)
+- active_batch: none
+- last_agreed_commit: Phase-6 chapter close (the chapter(5) commit publishing the chapter)
+- next_action: Chapter 5 is fully complete. All 10 drafted sections (§§5.1–5.10) at `workflow_status: complete`. §5.0 overview also `complete` after Phase-6 lockstep. TOC updated. Chapter plan updated (Item 6 wikilink rule clarified to permit intra-chapter `§N.M`; Item 1 §5.10 length cell updated to 2000–2200 reflecting the relaxed Phase-4 brief band). Phase-6 voice pass closed in 3 rounds (round 1: 6 codex critiques surfaced — main contested 1 [`p6-c3` wikilink display rule, codex conceded] and accepted 5; round 2: codex caught 2 remaining `GOD` instances missed in round-1 application; round 3: AGREED). Next steps when user ready: Ch 6 Phase 1 research (main + codex RESEARCH + gemini in parallel), then Phase 2 deal-loop, etc. Ch 6 spec from chapter plan: PointNet/++, VoxelNet/SECOND, PointPillars, CenterPoint + anchor-free 3D, Transformer-based 3D, eval metrics, deployment, safety. Ch 6 inherits Ch 5's failure-mode catalog (most entries survive structurally; some shift cause-class), the four representations (raw / voxel / range image / BEV), and the load-bearing-classical-in-DL-stacks list (preprocessing, ground seg as CNN front-end, tracking, GOD/occupancy fallback, HD-map ROI gating).
 
 ### open_conflict_threads
 
-(none — all 5 Batch-2 deal-loops closed at AGREED; no in-flight CONFLICT threads)
+(none — Phase-6 chapter voice pass AGREED in 3 rounds; no in-flight CONFLICT threads)
 
 ### blocked_user_inputs
 
@@ -45,7 +45,11 @@ Short bullets of completed work that is not obvious from `next_action` or the la
 - Ch 5 Phase-4 **Batch 1** drafts (§5.1, §5.6, §5.8) — Phase 5 AGREED at commits `6392e15`, `f29f2ba`, `96d782a`. cc-writer drafted §5.6; codex-writer drafted §5.1 and §5.8 (each got Rule 3b gemini factual spot-check + Rule 3c codex-bias checklist).
 - Ch 5 Phase-4 **Batch 2** drafts (§5.2, §5.3, §5.4, §5.5, §5.7) — Phase 5 AGREED at commits `5046122`, `acd529b`, `0ccaf75`, `d99806a`, `8dd9cc2`. cc-writer drafted §5.4 + §5.7; codex-writer drafted §5.2, §5.3, §5.5 (each got Rule 3b gemini factual spot-check — §5.2 needed Patchwork++ revision, §5.3 + §5.5 PASS — and Rule 3c codex-bias checklist). Deal-loop rounds: §5.2 (3), §5.3 (4), §5.4 (5), §5.5 (4), §5.7 (6). §5.4 / §5.7 needed extra rounds because of contract-side-channel design (§5.4 / §5.5 contract: `extent_source`, `class_prior_source`, `yaw_confidence`, `corner_visibility` ride alongside the binding tuple) and ROI/GOD-boundary policy consistency across §5.7's six reference points.
 - Ch 5 Phase-4 **Batch 3** draft (§5.9 deployment & runtime) — Phase 5 AGREED at commit `f7f5bd7` in 3 rounds. cc-drafted (Rule 3a contested framing). Phase-4 brief deal-loop ran first (codex round 1: 6 critiques on cadence math / p99 / forward-contract redundancy / terminology / structure / length-budgets; codex round 2: AGREED). Phase-5 round 1: 6 codex critiques (frame-rate/period conflation, production-default overclaim, padded passages, terminology drift, p99 validation_test envelope, missing inline ROS2 prereqs) — applied via cc-writer one-section revision sentinel (round 2). Phase-5 round 2: 1 critique (r2-c1 field-robustness opener wrong: low light does not directly degrade LiDAR returns) — applied via main-direct minor (single-sentence wording fix). Round 3: AGREED. Brief artifacts at `_workflow/briefs/ch5_5_9_deployment_runtime_brief.md` + `_workflow/briefs/ch5_5_9_revision_round_2.md`.
-- Codex worktree at `../auto-driving-codex-worktree` is on branch `codex-writer-isolated`, currently at `55d2c32` (ff'd from `32884a9` before §5.9 dispatch; 3 stale Batch-2 leftover files were verified byte-identical to round-1 wip commits, deleted, then ff'd via `git merge --ff-only main`); now ~3 commits behind main HEAD `f7f5bd7` since the §5.9 deal-loop ran on main.
+- Codex worktree at `../auto-driving-codex-worktree` is on branch `codex-writer-isolated`, currently at `55d2c32` (ff'd from `32884a9` before §5.9 dispatch); behind main HEAD since the Ch 5 §5.9 + §5.10 deal-loops + Phase-6 voice pass + chapter-close commit all ran on main without codex-writer involvement (Ch 5 had no codex-drafted sections in Batch 3 + Batch 4). Ff to main before any Ch 6 codex-writer dispatch.
+- **Ch 5 §5.10 (Batch 4) close** — Phase-4 brief deal-loop with codex-collaborator AGREED in 5 rounds at commit `8135022` (round 1: 6 critiques on catalog ownership / 600-word budget / source-of-truth / mAP wording / taxonomy / Ch 11 boundary; rounds 2–5 closed remaining arithmetic / bucket-rule / stale-text issues). cc-writer round 1 draft at `d3e638b`; round 2 cc-writer revision at `a41cd2d` after codex round-1 critique listed 6 defects (mAP overclaim×2 / `5_7.fm.map_suppresses_real_actor` bucket misplacement / `GOD` terminology drift / 91-word length overage / cell-cap violation). Per-section AGREED at `e0bddc1`.
+- **Ch 5 Phase-6 voice pass close** — round 1 codex returned 6 surface critiques at the 4-files-touched scope (terminology drift `GOD`/`freespace`, wikilink display rule, §5.7 over-long opener, §5.5 dense paragraph, §5.10 row/count consistency); main session contested `p6-c3` with category `pedagogically-worse` and codex conceded; resulting plan: 2 main-direct: writer-overhead fixes + 3 cc-writer fixes + chapter-plan rule clarification at commit `ca7133a`. Round 2 codex caught 2 remaining `GOD` instances main missed in §5.7:119 + 5_7.fm.map_suppresses_real_actor cause cell. Round 3 AGREED.
+- **§5.10 length-band update** — Phase-3 plan Item 1 §5.10 cell updated from "1000–1800" → "2000–2200" to match the brief's relaxed band (catalog index workload was not foreseeable when the chapter plan was drafted). Lockstep applied in chapter-close commit.
+- **Wikilink rule clarification** — Phase-3 plan Item 6 voice rule updated: cross-chapter wikilinks display as `Ch N §N.M`; intra-chapter wikilinks may display as bare `§N.M` because chapter context is implicit. Existing wikilinks unchanged. This was the codex-conceded `p6-c3` outcome.
 - Memory rules established earlier: `feedback_user_role_in_phases.md` (codex AGREED is the decision; no human review; no open questions for user), `reference_zh_filename_convention.md` (Chinese slugs for `_ZH.md` files), `feedback_state_md_discipline.md` (STATE.md is fast-recovery snapshot, NOT source of truth).
 - **Phase-5 discipline update at `69e2d6e`** — codex-collaborator + main-session AGREED on three changes after Batch 2 surfaced an enforcement gap: (1) Phase-5 revisions default to re-dispatching the original writer (cc-writer or codex-writer), with a one-section revision sentinel and `main-direct: minor / adjudication / writer-overhead` audit tags for direct edits; (2) bidirectional convergence — main may push back via `CONTESTED: <critique-id> — <category>: <one-line>` with closed-list categories `already-satisfied / technically-wrong / pedagogically-worse / out-of-scope / over-budget / chapter-context`; (3) Rule 3b risk-based rerun, Rule 3c per-substantial-revision, new Rule 3d for round-4+ codex-only editorial loops. New memory file `feedback_phase5_revisions.md` carries the concise rule list. Applies to Batch 3 forward; Batch 2 commits stay as historical record.
 

@@ -3,7 +3,7 @@ chapter: 5
 section: 0
 title: Classical LiDAR Detection — Overview
 language: EN
-status: planned
+status: complete
 tags:
   - book/section
   - book/chapter-5
@@ -37,17 +37,17 @@ tags:
 ## Sections
 | § | Title | Status (EN) | Status (ZH) |
 |---|-------|:-----------:|:-----------:|
-| 5.0 | Overview (this page) | ◐ | ◐ |
-| 5.1 | Point-cloud preprocessing (incl. *Representation map* primer) | ○ | ○ |
-| 5.2 | Ground segmentation (RANSAC etc.) | ○ | ○ |
-| 5.3 | Clustering — Euclidean, DBSCAN | ○ | ○ |
-| 5.4 | Object-shape fitting — L-shape, OBB, class priors | ○ | ○ |
-| 5.5 | Multi-object tracking — Kalman / IMM / JPDA | ○ | ○ |
-| 5.6 | Registration — ICP / NDT / GICP (depth behind [[2_0_overview_EN\|Ch 2]] localization, plus four perception roles) | ○ | ○ |
-| 5.7 | Occupancy, free-space & map-aided ROI gating | ○ | ○ |
-| 5.8 | ROS2 integration | ○ | ○ |
-| 5.9 | Deployment & runtime constraints — CPU/GPU budget, latency, timing, field robustness | ○ | ○ |
-| 5.10 | Safety & validation (template instance) | ○ | ○ |
+| 5.0 | Overview (this page) | ● | ◐ |
+| 5.1 | Point-cloud preprocessing (incl. *Representation map* primer) | ● | ○ |
+| 5.2 | Ground segmentation (RANSAC etc.) | ● | ○ |
+| 5.3 | Clustering — Euclidean, DBSCAN | ● | ○ |
+| 5.4 | Object-shape fitting — L-shape, OBB, class priors | ● | ○ |
+| 5.5 | Multi-object tracking — Kalman / IMM / JPDA | ● | ○ |
+| 5.6 | Registration — ICP / NDT / GICP (depth behind [[2_0_overview_EN\|Ch 2]] localization, plus four perception roles) | ● | ○ |
+| 5.7 | Occupancy, free-space & map-aided ROI gating | ● | ○ |
+| 5.8 | ROS2 integration | ● | ○ |
+| 5.9 | Deployment & runtime constraints — CPU/GPU budget, latency, timing, field robustness | ● | ○ |
+| 5.10 | Safety & validation (template instance) | ● | ○ |
 
 ## Further reading
 - _See [[reading_list]] (Chapter 5 entries — PCL, classical LiDAR papers, RANSAC, ICP / NDT, occupancy mapping)._

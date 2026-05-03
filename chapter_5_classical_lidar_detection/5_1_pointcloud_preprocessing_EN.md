@@ -3,7 +3,7 @@ chapter: 5
 section: 1
 title: Point-cloud preprocessing
 language: EN
-workflow_status: reviewing
+workflow_status: complete
 tags:
   - book/section
   - book/chapter-5

@@ -3,7 +3,7 @@ chapter: 5
 section: 4
 title: Object-shape fitting — L-shape, OBB, class priors
 language: EN
-workflow_status: reviewing
+workflow_status: complete
 tags:
   - book/section
   - book/chapter-5
