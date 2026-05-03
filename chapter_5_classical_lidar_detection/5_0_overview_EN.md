@@ -38,7 +38,7 @@ tags:
 | § | Title | Status (EN) | Status (ZH) |
 |---|-------|:-----------:|:-----------:|
 | 5.0 | Overview (this page) | ● | ◐ |
-| 5.1 | Point-cloud preprocessing (incl. *Representation map* primer) | ● | ○ |
+| 5.1 | Point-cloud preprocessing (incl. *Representation map* primer) | ◐ (extending) | ○ |
 | 5.2 | Ground segmentation (RANSAC etc.) | ● | ○ |
 | 5.3 | Clustering — Euclidean, DBSCAN | ◐ (extending) | ○ |
 | 5.4 | Object-shape fitting — L-shape, OBB, class priors | ● | ○ |
