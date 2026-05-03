@@ -3,7 +3,7 @@ chapter: 5
 section: 3
 title: Clustering
 language: EN
-workflow_status: reviewing
+workflow_status: draft
 tags:
   - book/section
   - book/chapter-5
@@ -184,7 +184,15 @@ For a same-surface case (`d1 ≈ d2`), the denominator `d1 − d2 cos α` is sma
 
 The threshold rationale is geometric, not magical. `β_thresh = 10°` is permissive for smooth surfaces because same-surface pairs with small `α` produce angles near 90°. It is strict for foreground/background discontinuities because a large ratio `d1/d2` collapses the angle toward the line of sight. The sensor's `α` still matters: vertical adjacency for an HDL-32E or VLP-32C is much coarser than horizontal adjacency, while an HDL-64E has finer vertical sampling. Typical angular steps often cited for these sensors are roughly HDL-32E `1.33°` vertical and `0.16°` horizontal at 10 Hz, HDL-64E `0.43°` vertical and `0.16°` horizontal, and VLP-32C `1.33°` vertical and `0.2°` horizontal. A production implementation should use the sensor calibration table, not assume a uniform `Δθ`.
 
-Worked example. Use `α = 0.2° = 0.00349 rad` and `β_thresh = 10°`. For two neighboring pixels on the same surface, set `d1 = 10.05` and `d2 = 10.0`:
+Worked example. Use `α = 0.2° = 0.00349 rad` and `β_thresh = 10°`. For the ideal same-surface limit, set `d1 = d2 = 10.0`:
+
+```
+numerator   = 10.0 · sin(0.00349)         ≈ 0.0349
+denominator = 10.0 − 10.0 · cos(0.00349)  ≈ 0.0000610
+β = atan2(0.0349, 6.10e-5) ≈ 89.9°
+```
+
+For a more realistic same-surface pair with 5 cm of range fluctuation, set `d1 = 10.05` and `d2 = 10.0`:
 
 ```
 numerator   = 10.0 · sin(0.00349)        ≈ 0.0349
@@ -192,7 +200,7 @@ denominator = 10.05 − 10.0 · cos(0.00349) ≈ 0.0501
 β = atan2(0.0349, 0.0501) ≈ 34.8°
 ```
 
-This still exceeds `10°`, so the pixels connect. With a smaller depth difference, the angle moves closer to 90°; for example `d1 = 10.005`, `d2 = 10.0` gives `β ≈ 81.7°`. For a depth jump, set `d1 = 30.0` and `d2 = 10.0`:
+This still exceeds `10°`, so the pixels connect. The apparent gap between the "close to 90°" prose and the `34.8°` example is just the difference between the ideal equal-range limit and a real surface with sub-decimeter fluctuation: equal ranges drive `β` toward 90°, while realistic same-surface pairs often land in the 30-80° band, and the classifier only needs `β > β_thresh`, not `β ≈ 90°`. With a smaller depth difference, the angle moves closer to 90°; for example `d1 = 10.005`, `d2 = 10.0` gives `β ≈ 81.7°`. For a depth jump, set `d1 = 30.0` and `d2 = 10.0`:
 
 ```
 numerator   = 10.0 · sin(0.00349)        ≈ 0.0349
@@ -205,8 +213,6 @@ This falls below `10°`, so the labeler starts a new component. If the implement
 After labeling, post-processing converts components back into the §5.4 handoff. Reject tiny components by point count, optionally using range-aware size gates so far small objects are not erased. Reject huge components that span walls, embankments, or projection artifacts. Then gather the stored original point indices for each surviving label, compute the cluster-bbox approximation in `base_link`, and publish the index list rather than only the image cells. That projection-back step is not bookkeeping trivia: §5.4 needs the original residual points for L-shape, PCA-OBB, min-area rectangle, convex hull, and class-prior fitting.
 
 The usual implementation order is therefore: project residual points, fill the range image, label connected components with β, reject components by size and projection diagnostics, gather original point indices, compute the approximate bbox, and publish the cluster array. The order matters. If size gating happens before projection-back, it should still use original point counts, not just occupied cell counts, because a near vehicle can place multiple returns into the same angular bin while a far object may occupy only a few bins. If bbox computation happens in image space, it loses the `base_link` contract that §5.4 expects.
-
-In words: if two adjacent beams hit the same slanted car side, their ranges differ smoothly and `β` stays high. If one beam hits a pedestrian at 12 m and the next goes to a wall at 30 m, the range discontinuity makes the chord nearly aligned with the line of sight, and `β` collapses toward zero.
 
 Range-image clustering is attractive before voxelization or after preserving ring/azimuth metadata. It is `O(N)` over occupied pixels, cache-friendly, and deterministic. It also keeps scan-line evidence that Euclidean clustering loses. Usage usually starts with `β_thresh = 10°`, 4-neighbor connectivity for conservative separation, a small-component gate after labeling, and projection diagnostics that track empty-cell rate by ring. Raising `β_thresh` makes the algorithm stricter and can over-segment slanted or sparsely sampled surfaces. Lowering it connects more neighbors and can bridge true depth jumps. If components flicker at azimuth wraparound, inspect seam handling; if thin actors disappear, inspect missing rings and the size gate before changing the angle threshold.
 
